@@ -42,6 +42,18 @@ function asLiteral(text) {
 }
 
 /**
+ * Normalize line endings to LF.
+ *
+ * The generated bundle is committed, and `.gitattributes` stores it with LF.
+ * If a Windows checkout has CRLF on disk, an un-normalized build would produce
+ * a file that differs from the committed one byte-for-byte, making
+ * `--check` fail and the artifact non-reproducible across platforms.
+ */
+function toLf(text) {
+  return text.replace(/\r\n?/g, '\n');
+}
+
+/**
  * Guard against inputs that would break the substitution.
  *
  * The artwork JS is embedded as a JS string literal and later run through
@@ -84,9 +96,9 @@ async function main() {
   if (!template.includes(JS_MARK)) throw new Error(`template is missing ${JS_MARK}`);
   if (!template.includes(CSS_MARK)) throw new Error(`template is missing ${CSS_MARK}`);
 
-  const built = template
+  const built = toLf(template
     .replace(JS_MARK, asLiteral(artJs))
-    .replace(CSS_MARK, asLiteral(artCss));
+    .replace(CSS_MARK, asLiteral(artCss)));
 
   verifySyntax(built);
 
