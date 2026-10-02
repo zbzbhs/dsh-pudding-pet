@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Pudding pet">
+  <rect width="64" height="64" rx="14" fill="#2b2c30"/>
+  <!-- ears -->
+  <path d="M18 26 L15 11 L29 19 Z" fill="#FFE9C9" stroke="#4A342A" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M46 26 L49 11 L35 19 Z" fill="#FFE9C9" stroke="#4A342A" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M20 23 L18.6 15.5 L26 20 Z" fill="#F79A86"/>
+  <path d="M44 23 L45.4 15.5 L38 20 Z" fill="#F79A86"/>
+  <!-- head -->
+  <ellipse cx="32" cy="34" rx="19" ry="16.5" fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+  <!-- caramel patch -->
+  <path d="M18.5 26.5 C22 20.5 42 20.5 45.5 26.5 C40 23.5 24 23.5 18.5 26.5 Z" fill="#E8A85C"/>
+  <!-- eyes -->
+  <ellipse cx="25" cy="33" rx="4.4" ry="5.2" fill="#fff" stroke="#4A342A" stroke-width="2"/>
+  <ellipse cx="39" cy="33" rx="4.4" ry="5.2" fill="#fff" stroke="#4A342A" stroke-width="2"/>
+  <ellipse cx="25" cy="33.6" rx="2.7" ry="3.4" fill="#3E7C8F"/>
+  <ellipse cx="39" cy="33.6" rx="2.7" ry="3.4" fill="#3E7C8F"/>
+  <circle cx="23.9" cy="32" r="1.15" fill="#fff"/>
+  <circle cx="37.9" cy="32" r="1.15" fill="#fff"/>
+  <!-- nose + mouth -->
+  <path d="M32 39.4 L29.4 37.4 Q32 35.8 34.6 37.4 Z" fill="#F2907E"/>
+  <path d="M32 39.6 Q32 42 29.6 42.4 M32 39.6 Q32 42 34.4 42.4" stroke="#4A342A" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- scarf -->
+  <path d="M18 48 Q32 55 46 48 L46 52 Q32 59 18 52 Z" fill="#4FB6A6"/>
+  <circle cx="32" cy="52.6" r="3.1" fill="#3d9c8e"/>
+</svg>

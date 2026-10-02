@@ -1,0 +1,27 @@
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (this package has no runtime dependencies, but dev tooling may add some)
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Local scratch: screenshots, logs, throwaway scripts
+*.log
+tmp/
+scratch/
+
+# NOTE: lib/client.js IS committed on purpose.
+# It is the artifact DSH actually loads, and the build is a deterministic text
+# substitution (tools/build.mjs), so keeping it in the repo lets the plugin be
+# installed straight from git without a build step.
+# Verify freshness with: node tools/build.mjs --check

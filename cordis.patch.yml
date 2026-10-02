@@ -1,0 +1,13 @@
+# 布丁桌宠 / Pudding Pet
+#
+# Adds only this bundle's own plugin row. It overrides no shipped DSH component.
+#
+# The client half is driven by the `dsh.client` block in package.json; this patch
+# only inserts the host row. The host half currently does nothing but exist, so
+# that the client module can be loaded as part of a bundle (a package without
+# `dsh.bundle.patch` never joins the bundle stack).
+- insert:
+    - id: pudding-pet
+      name: dsh-pudding-pet
+      config:
+        enabled: true

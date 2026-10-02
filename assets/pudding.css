@@ -1,0 +1,492 @@
+/* =============================================================================
+   布丁 / Pudding — DSH desktop-pet cat · state animation stylesheet
+   -----------------------------------------------------------------------------
+   Original work, dedicated to the public domain (CC0-1.0).
+   See LICENSE-ASSETS.md.  Not affiliated with Outfit7's "Talking Tom".
+
+   Contract
+   --------
+   The root <svg> carries `class="cat is-<state>"`.  Exactly one `is-*` state
+   class is present at a time; `.is-hover` may be added on top of it.
+
+   Every state defines BOTH
+     (a) a static pose  (plain transform/opacity), and
+     (b) an animation layered on top that repeats (a) in its keyframes.
+   So `.cat.no-anim` — which force-disables animations — still renders the
+   characteristic pose of each state.  That is what makes screenshot
+   verification possible and is also a graceful degradation path.
+
+   All transform origins use `transform-box: view-box` with explicit user-unit
+   coordinates from the 200x200 viewBox, which is deterministic for SVG (unlike
+   `fill-box`, whose box depends on stroke/child geometry).
+   ========================================================================== */
+
+/* ---------- palette (override these to re-skin the cat) ------------------ */
+.cat {
+  --fur:        #FFE9C9;   /* cream body            */
+  --fur-light:  #FFF6E6;   /* chest / muzzle        */
+  --fur-patch:  #E8A85C;   /* caramel cap, ears, tail */
+  --ink:        #4A342A;   /* outline / features    */
+  --iris:       #3E7C8F;   /* teal-blue iris        */
+  --pupil:      #241A16;
+  --accent:     #4FB6A6;   /* mint scarf            */
+  --accent-dk:  #3E9C8D;
+  --blush:      #F79A86;
+  --nose:       #F2907E;
+  --mouth:      #7A3B36;
+  --tongue:     #F2907E;
+  --gold:       #F2C14E;
+  --tear:       #7FC8E8;
+
+  /* driven by JS (cat.js) — mouse gaze, normalised then scaled to px */
+  --gaze-x: 0px;
+  --gaze-y: 0px;
+  /* driven by state rules below */
+  --gaze-state-x: 0px;
+  --gaze-state-y: 0px;
+  /* driven by setTalkRate() */
+  --talk-duration: 230ms;
+
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* ---------- shared transform plumbing ----------------------------------- */
+.cat .stage,
+.cat .head,
+.cat .tail,
+.cat .ear,
+.cat .leg,
+.cat .jaw,
+.cat .lid,
+.cat .iris,
+.cat .pupil,
+.cat .shadow,
+.cat .gaze-state,
+.cat .gaze-track,
+.cat .zzz .z,
+.cat .sparkle,
+.cat .dot,
+.cat .surprise,
+.cat .tear,
+.cat .work-marks {
+  transform-box: view-box;
+}
+
+.cat .stage       { transform-origin: 100px 188px; }
+.cat .head        { transform-origin: 100px 114px; }
+.cat .tail        { transform-origin: 130px 178px; }
+.cat .ear-l       { transform-origin: 56px 56px; }
+.cat .ear-r       { transform-origin: 144px 56px; }
+.cat .leg-l       { transform-origin: 80px 140px; }
+.cat .leg-r       { transform-origin: 120px 140px; }
+.cat .jaw         { transform-origin: 100px 101px; }
+.cat .eye-l .lid  { transform-origin: 79px 54px; }
+.cat .eye-r .lid  { transform-origin: 121px 54px; }
+.cat .eye-l .iris,
+.cat .eye-l .pupil { transform-origin: 79px 70px; }
+.cat .eye-r .iris,
+.cat .eye-r .pupil { transform-origin: 121px 70px; }
+.cat .shadow      { transform-origin: 100px 189px; }
+.cat .z1 { transform-origin: 158px 47px; }
+.cat .z2 { transform-origin: 167px 32px; }
+.cat .z3 { transform-origin: 174px 17px; }
+.cat .s1 { transform-origin: 40px 41px; }
+.cat .s2 { transform-origin: 162px 46.5px; }
+.cat .s3 { transform-origin: 152px 16.5px; }
+.cat .d1 { transform-origin: 142px 60px; }
+.cat .d2 { transform-origin: 153px 52px; }
+.cat .d3 { transform-origin: 166px 42px; }
+.cat .surprise { transform-origin: 46px 33px; }
+.cat .tear { transform-origin: 70px 97px; }
+
+/* gaze layers: state offset (inner) + mouse offset (outer) compose */
+.cat .gaze-state { transform: translate(var(--gaze-state-x), var(--gaze-state-y)); }
+.cat .gaze-track { transform: translate(var(--gaze-x), var(--gaze-y)); }
+
+/* ---------- default (idle) resting values -------------------------------- */
+.cat .lid      { transform: scaleY(0); }          /* 0 = open            */
+.cat .jaw      { transform: scaleY(0.2); }
+.cat .mouth    { opacity: 0; }
+.cat .mouth-closed { opacity: 1; }
+.cat .zzz,
+.cat .sparkles,
+.cat .dots,
+.cat .surprise,
+.cat .work-marks { opacity: 0; }
+.cat .tear     { opacity: 0; }
+.cat .lash     { opacity: 0; }
+.cat .brow     { opacity: 0; }
+
+/* =========================================================================
+   1. idle — breathing + tail sway + periodic blink
+   ========================================================================= */
+.cat.is-idle .stage {
+  transform: translateY(0) scale(1, 1);
+  animation: breathe 3.6s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50%      { transform: translateY(-2px) scale(1.012, 1.022); }
+}
+
+.cat.is-idle .tail { transform: rotate(0deg); animation: tailSway 3.2s ease-in-out infinite; }
+@keyframes tailSway {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(9deg); }
+}
+
+.cat.is-idle .shadow { animation: shadowBreathe 3.6s ease-in-out infinite; }
+@keyframes shadowBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.13; }
+  50%      { transform: scale(0.965); opacity: 0.10; }
+}
+
+/* blink: lid drops for ~8% of a 4.4s cycle; lash fades in on the same clock */
+.cat.is-idle .lid       { animation: blink 4.4s linear infinite; }
+.cat.is-idle .lash-blink { animation: lashBlink 4.4s linear infinite; }
+@keyframes blink {
+  0%, 91%, 100% { transform: scaleY(0); }
+  93.5%, 95.5%  { transform: scaleY(1); }
+  98%           { transform: scaleY(0.12); }
+}
+@keyframes lashBlink {
+  0%, 91%, 100% { opacity: 0; }
+  93.5%, 95.5%  { opacity: 1; }
+  98%           { opacity: 0; }
+}
+
+/* JS-driven blink for every eyes-open state except `idle` (which blinks in
+   pure CSS so it keeps working without JS).  cat.js toggles `.is-blink`. */
+.cat.is-blink .lid       { transform: scaleY(1) !important; }
+.cat.is-blink .lash-blink { opacity: 1 !important; }
+
+/* =========================================================================
+   2. listen — ears up, pupils dilated, body leans toward the screen
+   ========================================================================= */
+.cat.is-listen .ear-l { transform: rotate(18deg) translateY(-3px); }
+.cat.is-listen .ear-r { transform: rotate(-18deg) translateY(-3px); }
+.cat.is-listen .stage {
+  transform: translateY(-4px) scale(1.04, 1.035);
+  animation: listenLean 2.4s ease-in-out infinite;
+}
+@keyframes listenLean {
+  0%, 100% { transform: translateY(-4px) scale(1.04, 1.035); }
+  50%      { transform: translateY(-6px) scale(1.05, 1.042); }
+}
+.cat.is-listen .head  { transform: translateY(-2px); }
+.cat.is-listen .iris,
+.cat.is-listen .pupil { transform: scale(1.15); }
+.cat.is-listen .brow  { opacity: 1; transform: translateY(-1.5px); }
+.cat.is-listen .mouth-closed { opacity: 0; }
+.cat.is-listen .mouth-flat   { opacity: 1; }
+.cat.is-listen .shadow { transform: scale(0.97); opacity: 0.11; }
+
+/* =========================================================================
+   3. think — head tilt + eyes rolled up + thought dots
+   ========================================================================= */
+.cat.is-think .head {
+  transform: rotate(-9deg) translateY(-1px);
+  animation: thinkTilt 3.4s ease-in-out infinite;
+}
+@keyframes thinkTilt {
+  0%, 100% { transform: rotate(-9deg) translateY(-1px); }
+  50%      { transform: rotate(-4deg) translateY(-1px); }
+}
+.cat.is-think .gaze-state { --gaze-state-x: 1.5px; --gaze-state-y: -3.5px; }
+.cat.is-think .mouth-closed { opacity: 0; }
+.cat.is-think .mouth-flat   { opacity: 1; }
+.cat.is-think .brow-l { opacity: 1; transform: translateY(-2px) rotate(-6deg); }
+.cat.is-think .dots   { opacity: 1; }
+.cat.is-think .dot    { animation: dotPulse 1.5s ease-in-out infinite; }
+.cat.is-think .d2     { animation-delay: 0.22s; }
+.cat.is-think .d3     { animation-delay: 0.44s; }
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.75); }
+  50%      { opacity: 1;    transform: scale(1.18); }
+}
+.cat.is-think .tail { transform: rotate(-6deg); animation: tailThink 2.6s ease-in-out infinite; }
+@keyframes tailThink {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(3deg); }
+}
+
+/* =========================================================================
+   4. work — front paws tap alternately, like typing
+   ========================================================================= */
+.cat.is-work .leg-l {
+  transform: translateY(-9px) rotate(-11deg);
+  animation: typeA 0.42s ease-in-out infinite;
+}
+.cat.is-work .leg-r {
+  transform: translateY(-9px) rotate(11deg);
+  animation: typeB 0.42s ease-in-out infinite;
+  animation-delay: 0.21s;
+}
+@keyframes typeA {
+  0%, 100% { transform: translateY(-2px) rotate(-2deg); }
+  50%      { transform: translateY(-12px) rotate(-14deg); }
+}
+@keyframes typeB {
+  0%, 100% { transform: translateY(-2px) rotate(2deg); }
+  50%      { transform: translateY(-12px) rotate(14deg); }
+}
+.cat.is-work .head { transform: rotate(-3deg) translateY(2px); }
+.cat.is-work .gaze-state { --gaze-state-y: 2.5px; }
+.cat.is-work .mouth-closed { opacity: 0; }
+.cat.is-work .mouth-flat   { opacity: 1; }
+.cat.is-work .brow-l { opacity: 1; transform: translateY(1.5px) rotate(5deg); }
+.cat.is-work .brow-r { opacity: 1; transform: translateY(1.5px) rotate(-5deg); }
+.cat.is-work .work-marks { opacity: 1; }
+.cat.is-work .wm { animation: wmPulse 0.42s ease-in-out infinite; }
+.cat.is-work .wm-r { animation-delay: 0.21s; }
+@keyframes wmPulse {
+  0%, 100% { opacity: 0.2; transform: translateY(2px); }
+  50%      { opacity: 1;   transform: translateY(-2px); }
+}
+.cat.is-work .tail { transform: rotate(4deg); animation: tailWork 1.1s ease-in-out infinite; }
+@keyframes tailWork {
+  0%, 100% { transform: rotate(2deg); }
+  50%      { transform: rotate(9deg); }
+}
+
+/* =========================================================================
+   5. waiting — left paw raised and waving, ears up, looking at you
+   ========================================================================= */
+.cat.is-waiting .leg-l {
+  transform: translateY(-6px) rotate(-72deg);
+  animation: pawWave 1.15s ease-in-out infinite;
+}
+@keyframes pawWave {
+  0%, 100% { transform: translateY(-6px) rotate(-72deg); }
+  50%      { transform: translateY(-6px) rotate(-58deg); }
+}
+.cat.is-waiting .leg-r { transform: translateY(-1px); }
+.cat.is-waiting .ear-l { transform: rotate(11deg); }
+.cat.is-waiting .ear-r { transform: rotate(-11deg); }
+.cat.is-waiting .head  {
+  transform: translateY(-2px) rotate(2deg);
+  animation: waitNod 1.6s ease-in-out infinite;
+}
+@keyframes waitNod {
+  0%, 100% { transform: translateY(-2px) rotate(2deg); }
+  50%      { transform: translateY(-4px) rotate(0.5deg); }
+}
+.cat.is-waiting .iris,
+.cat.is-waiting .pupil { transform: scale(1.1); }
+.cat.is-waiting .brow  { opacity: 1; transform: translateY(-2px); }
+.cat.is-waiting .mouth-closed { opacity: 0; }
+.cat.is-waiting .mouth-smile  { opacity: 1; }
+.cat.is-waiting .blush { opacity: 0.5; }
+
+/* =========================================================================
+   6. talk — jaw flaps; speed follows --talk-duration (set by cat.js)
+   ========================================================================= */
+.cat.is-talk .mouth-closed { opacity: 0; }
+.cat.is-talk .mouth-open   { opacity: 1; }
+.cat.is-talk .ear-l { transform: rotate(6deg); }
+.cat.is-talk .ear-r { transform: rotate(-6deg); }
+.cat.is-talk .jaw {
+  transform: scaleY(0.85);
+  animation: jawTalk var(--talk-duration) ease-in-out infinite;
+}
+@keyframes jawTalk {
+  0%, 100% { transform: scaleY(0.28); }
+  50%      { transform: scaleY(1); }
+}
+.cat.is-talk .head {
+  transform: translateY(0);
+  animation: talkBob 0.9s ease-in-out infinite;
+}
+@keyframes talkBob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-1.5px) rotate(-1.2deg); }
+}
+.cat.is-talk .tail { animation: tailSway 1.6s ease-in-out infinite; }
+
+/* =========================================================================
+   7. happy — eyes squeezed shut, big smile, fast tail, bouncing, sparkles
+   ========================================================================= */
+.cat.is-happy .lid        { transform: scaleY(1); }
+.cat.is-happy .lash-happy { opacity: 1; }
+.cat.is-happy .iris,
+.cat.is-happy .pupil,
+.cat.is-happy .glint,
+.cat.is-happy .glint2     { opacity: 0; }
+.cat.is-happy .mouth-closed { opacity: 0; }
+.cat.is-happy .mouth-smile  { opacity: 1; }
+.cat.is-happy .blush        { opacity: 0.62; }
+.cat.is-happy .brow-l       { opacity: 1; transform: translateY(-2px) rotate(-8deg); }
+.cat.is-happy .brow-r       { opacity: 1; transform: translateY(-2px) rotate(8deg); }
+.cat.is-happy .ear-l        { transform: rotate(10deg); }
+.cat.is-happy .ear-r        { transform: rotate(-10deg); }
+.cat.is-happy .stage {
+  animation: happyBounce 0.62s ease-in-out infinite;
+}
+@keyframes happyBounce {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  30%      { transform: translateY(-9px) scale(0.985, 1.035); }
+  55%      { transform: translateY(0) scale(1.025, 0.975); }
+  78%      { transform: translateY(-4px) scale(0.992, 1.018); }
+}
+.cat.is-happy .tail { animation: tailHappy 0.34s ease-in-out infinite; }
+@keyframes tailHappy {
+  0%, 100% { transform: rotate(-8deg); }
+  50%      { transform: rotate(16deg); }
+}
+.cat.is-happy .shadow { animation: shadowHappy 0.62s ease-in-out infinite; }
+@keyframes shadowHappy {
+  0%, 55%, 100% { transform: scale(1);    opacity: 0.13; }
+  30%, 78%      { transform: scale(0.86); opacity: 0.08; }
+}
+.cat.is-happy .sparkles { opacity: 1; }
+.cat.is-happy .sparkle  { animation: sparklePop 1.15s ease-in-out infinite; }
+.cat.is-happy .s2       { animation-delay: 0.24s; }
+.cat.is-happy .s3       { animation-delay: 0.48s; }
+@keyframes sparklePop {
+  0%, 100% { opacity: 0; transform: scale(0.35) rotate(0deg); }
+  50%      { opacity: 1; transform: scale(1.15) rotate(45deg); }
+}
+
+/* =========================================================================
+   8. sad — ears droop, gaze down, frown, a tear
+   ========================================================================= */
+.cat.is-sad .ear-l { transform: rotate(-19deg) translateY(4px); }
+.cat.is-sad .ear-r { transform: rotate(19deg)  translateY(4px); }
+.cat.is-sad .head  { transform: rotate(-4deg) translateY(3px); }
+.cat.is-sad .stage { transform: scale(0.985) translateY(1px); }
+.cat.is-sad .gaze-state { --gaze-state-y: 3.5px; }
+.cat.is-sad .iris,
+.cat.is-sad .pupil { transform: scale(0.93); }
+.cat.is-sad .brow-l { opacity: 1; transform: translateY(2px) rotate(9deg); }
+.cat.is-sad .brow-r { opacity: 1; transform: translateY(2px) rotate(-9deg); }
+.cat.is-sad .mouth-closed { opacity: 0; }
+.cat.is-sad .mouth-frown   { opacity: 1; }
+.cat.is-sad .blush        { opacity: 0.2; }
+.cat.is-sad .tear {
+  opacity: 1;
+  animation: tearDrop 3.2s ease-in infinite;
+}
+@keyframes tearDrop {
+  0%   { opacity: 0; transform: translateY(-3px) scale(0.55); }
+  22%  { opacity: 1; transform: translateY(0)    scale(1); }
+  78%  { opacity: 1; transform: translateY(7px)  scale(1); }
+  100% { opacity: 0; transform: translateY(12px) scale(0.85); }
+}
+.cat.is-sad .tail { transform: rotate(-13deg); animation: tailSad 4.2s ease-in-out infinite; }
+@keyframes tailSad {
+  0%, 100% { transform: rotate(-13deg); }
+  50%      { transform: rotate(-9deg); }
+}
+
+/* =========================================================================
+   9. sleep — eyes shut, slow deep breathing, snore bubbles
+   ========================================================================= */
+.cat.is-sleep .lid       { transform: scaleY(1); }
+.cat.is-sleep .lash-sleep { opacity: 1; }
+.cat.is-sleep .iris,
+.cat.is-sleep .pupil,
+.cat.is-sleep .glint,
+.cat.is-sleep .glint2    { opacity: 0; }
+.cat.is-sleep .mouth-closed { opacity: 0; }
+.cat.is-sleep .mouth-sleep  { opacity: 1; }
+.cat.is-sleep .head { transform: rotate(-5deg) translateY(4px); }
+.cat.is-sleep .ear-l { transform: rotate(-8deg) translateY(2px); }
+.cat.is-sleep .ear-r { transform: rotate(8deg)  translateY(2px); }
+.cat.is-sleep .blush { opacity: 0.24; }
+.cat.is-sleep .stage { animation: breatheSlow 5.4s ease-in-out infinite; }
+@keyframes breatheSlow {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50%      { transform: translateY(-1px) scale(1.022, 1.038); }
+}
+.cat.is-sleep .shadow { animation: shadowBreathe 5.4s ease-in-out infinite; }
+.cat.is-sleep .tail   { transform: rotate(-4deg); }
+.cat.is-sleep .zzz    { opacity: 1; }
+.cat.is-sleep .zzz .z { animation: zzzFloat 3.4s ease-in-out infinite; }
+.cat.is-sleep .z2     { animation-delay: 1.13s; }
+.cat.is-sleep .z3     { animation-delay: 2.26s; }
+@keyframes zzzFloat {
+  0%   { opacity: 0; transform: translateY(7px)  scale(0.75); }
+  22%  { opacity: 1; transform: translateY(0)    scale(1); }
+  75%  { opacity: 0.9; transform: translateY(-11px) scale(1.06); }
+  100% { opacity: 0; transform: translateY(-19px) scale(1.12); }
+}
+
+/* =========================================================================
+   10. poke — one-shot squash-and-rebound + startle
+   ========================================================================= */
+.cat.is-poke .stage {
+  animation: pokeSquash 0.62s cubic-bezier(0.22, 0.9, 0.3, 1) 1 both;
+}
+@keyframes pokeSquash {
+  0%   { transform: translateY(0) scale(1, 1); }
+  16%  { transform: translateY(5px) scale(1.15, 0.84); }
+  44%  { transform: translateY(-4px) scale(0.93, 1.09); }
+  68%  { transform: translateY(1px) scale(1.045, 0.965); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.cat.is-poke .ear-l { transform: rotate(17deg) translateY(-3px); }
+.cat.is-poke .ear-r { transform: rotate(-17deg) translateY(-3px); }
+.cat.is-poke .iris,
+.cat.is-poke .pupil { transform: scale(1.22); }
+.cat.is-poke .brow  { opacity: 1; transform: translateY(-3px); }
+.cat.is-poke .mouth-closed { opacity: 0; }
+.cat.is-poke .mouth-open   { opacity: 1; }
+.cat.is-poke .jaw          { transform: scaleY(0.5); }
+.cat.is-poke .surprise {
+  opacity: 1;
+  animation: surprisePop 0.62s ease-out 1 both;
+}
+@keyframes surprisePop {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-16deg); }
+  28%  { opacity: 1; transform: scale(1.2) rotate(6deg); }
+  62%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.95) rotate(0deg); }
+}
+.cat.is-poke .tail { animation: tailPoke 0.62s ease-out 1 both; }
+@keyframes tailPoke {
+  0%   { transform: rotate(0deg); }
+  30%  { transform: rotate(-22deg); }
+  70%  { transform: rotate(12deg); }
+  100% { transform: rotate(0deg); }
+}
+.cat.is-poke .shadow { animation: shadowPoke 0.62s ease-out 1 both; }
+@keyframes shadowPoke {
+  0%, 100% { transform: scale(1); opacity: 0.13; }
+  16%      { transform: scale(1.06); opacity: 0.16; }
+  44%      { transform: scale(0.9);  opacity: 0.09; }
+}
+
+/* =========================================================================
+   HOVER reaction — ears perk + pupils dilate.  `.cat.is-hover` is set by
+   cat.js on the host element (larger hit area than the artwork); the plain
+   `:hover` selector keeps the pure-CSS path working too.
+   Specificity is deliberately one class higher than the state rules above
+   so it layers on top of any state; eye states that are meant to be shut
+   (sleep / happy) keep their eyes shut.
+   ========================================================================= */
+.cat.is-hover .ear-l,
+.cat:hover .ear-l { transform: rotate(15deg) translateY(-2px); }
+.cat.is-hover .ear-r,
+.cat:hover .ear-r { transform: rotate(-15deg) translateY(-2px); }
+.cat.is-hover:not(.is-sleep):not(.is-happy):not(.is-poke) .iris,
+.cat.is-hover:not(.is-sleep):not(.is-happy):not(.is-poke) .pupil,
+.cat:hover:not(.is-sleep):not(.is-happy):not(.is-poke) .iris,
+.cat:hover:not(.is-sleep):not(.is-happy):not(.is-poke) .pupil { transform: scale(1.14); }
+.cat.is-hover:not(.is-sleep):not(.is-happy) .brow,
+.cat:hover:not(.is-sleep):not(.is-happy) .brow { opacity: 1; }
+
+/* =========================================================================
+   Freeze / accessibility
+   ========================================================================= */
+.cat.no-anim,
+.cat.no-anim * { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cat, .cat * { animation: none !important; }
+  .cat .lid { transform: scaleY(0); }   /* never leave the eyes stuck shut */
+  .cat.is-sleep .lid,
+  .cat.is-happy .lid { transform: scaleY(1); }
+}

@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>布丁语音实验室 · TTS 变声试听</title>
+<style>
+  :root{
+    --bg:#1b1c1e; --panel:#232427; --panel2:#2a2c30; --line:#3a3d42;
+    --ink:#e8eaed; --muted:#a3a8b0; --dim:#7c828b;
+    --accent:#4FB6A6; --accent2:#E8A85C; --danger:#e06c75;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:20px 18px 40px; background:var(--bg); color:var(--ink);
+    font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  }
+  h1{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+  h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 18px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px;margin-bottom:14px}
+  section h2{font-size:13px;margin:0 0 12px;color:var(--accent2);font-weight:600;letter-spacing:.02em}
+  .row{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+  .row label{min-width:76px;color:var(--muted);font-size:12.5px;flex:none}
+  input[type=range]{flex:1;min-width:130px;accent-color:var(--accent)}
+  select,textarea,input[type=text]{
+    background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:7px;padding:7px 9px;font:inherit;font-size:13px;
+  }
+  select{flex:1;min-width:150px}
+  textarea{width:100%;resize:vertical;min-height:64px;line-height:1.55}
+  .val{min-width:52px;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600;font-size:12.5px;flex:none}
+  button{
+    background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:7px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;
+    transition:background .12s,border-color .12s,transform .06s;
+  }
+  button:hover{background:#33363b;border-color:#4a4e54}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#10201d;font-weight:600}
+  button.primary:hover{background:#5cc4b3}
+  button.ghost{background:transparent}
+  .presets{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+  .presets button{font-variant-numeric:tabular-nums}
+  .presets button.on{border-color:var(--accent);color:var(--accent);background:#26403c}
+  .status{font-size:12px;color:var(--dim);margin-top:9px;line-height:1.7}
+  .status b{color:var(--muted);font-weight:600}
+  .warn{color:var(--accent2)}
+  .bad{color:var(--danger)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .box{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.65}
+  .box h3{margin:0 0 7px;font-size:11.5px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .box .mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;white-space:pre-wrap;word-break:break-word;color:var(--muted)}
+  .box .clean{color:var(--accent)}
+  .eq{display:flex;align-items:flex-end;gap:3px;height:26px;margin-left:6px}
+  .eq i{width:4px;background:var(--accent);border-radius:2px;height:5px;transition:height .09s}
+  .eq.on i{animation:bounce .62s ease-in-out infinite}
+  .eq i:nth-child(2){animation-delay:.09s}
+  .eq i:nth-child(3){animation-delay:.18s}
+  .eq i:nth-child(4){animation-delay:.27s}
+  .eq i:nth-child(5){animation-delay:.36s}
+  @keyframes bounce{0%,100%{height:5px}50%{height:24px}}
+  .note{font-size:12px;color:var(--dim);margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+  kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+</style>
+</head>
+<body>
+
+<h1><span class="dot"></span>布丁语音实验室</h1>
+<p class="sub">试听音色与变声强度，选定后我把参数写进插件。所有声音都是本机离线合成，不联网、不花钱。</p>
+
+<section>
+  <h2>① 引擎状态</h2>
+  <div id="engineStatus" class="status">正在检测本机语音…</div>
+</section>
+
+<section>
+  <h2>② 试听</h2>
+
+  <div class="row">
+    <label>朗读内容</label>
+  </div>
+  <textarea id="text">你好呀，我是布丁。今天想陪你一起干活，你说什么我就跟着念什么。</textarea>
+
+  <div class="row" style="margin-top:11px">
+    <label>音色</label>
+    <select id="voice"></select>
+  </div>
+
+  <div class="row">
+    <label>变声强度</label>
+    <input id="pitch" type="range" min="0.5" max="2" step="0.05" value="1.7">
+    <span class="val" id="pitchVal">1.70</span>
+  </div>
+
+  <div class="row">
+    <label>语速</label>
+    <input id="rate" type="range" min="0.5" max="1.8" step="0.05" value="1.05">
+    <span class="val" id="rateVal">1.05</span>
+  </div>
+
+  <div class="row">
+    <label>音量</label>
+    <input id="volume" type="range" min="0" max="1" step="0.05" value="1">
+    <span class="val" id="volVal">1.00</span>
+  </div>
+
+  <div class="row">
+    <button class="primary" id="play">▶ 试听</button>
+    <button id="stop">⏹ 停止</button>
+    <div class="eq" id="eq"><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+
+  <div style="margin-top:13px">
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:7px">快速对比（点一下立即朗读）</div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <button id="sequence">🎧 连续对比 1.0 → 2.0</button>
+    <button class="ghost" id="reset">恢复默认（1.70）</button>
+  </div>
+
+  <div class="note">
+    <b>变声强度</b>就是音高倍率：<code>1.0</code> 是原声，<code>1.7</code> 是偏「汤姆味」的搞怪升调。
+    超过 <code>1.9</code> 可能开始发尖、听久累耳。
+  </div>
+</section>
+
+<section>
+  <h2>③ 读助手回复（Markdown 清洗演示）</h2>
+  <p class="sub" style="margin:-4px 0 12px">
+    念的是「给人听」的版本，不是屏幕上的 Markdown——代码块整块丢掉、表格用「，」连、链接只念文字。
+  </p>
+  <div class="grid2">
+    <div class="box">
+      <h3>屏幕上的原文</h3>
+      <div class="mono" id="rawMd"></div>
+    </div>
+    <div class="box">
+      <h3>实际会念出来的</h3>
+      <div class="clean" id="cleanMd"></div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="primary" id="playClean">▶ 朗读清洗后的版本</button>
+  </div>
+</section>
+
+<script>
+(function(){
+  'use strict';
+
+  var $ = function(id){ return document.getElementById(id); };
+  var synth = window.speechSynthesis;
+  var voices = [];
+  var current = null;
+  var seqToken = 0;
+
+  // ---------- Markdown 清洗（与插件将采用的规则一致）----------
+  function cleanMarkdown(src){
+    var t = String(src == null ? '' : src);
+    t = t.replace(/\r\n?/g, '\n');
+    // 1. 围栏代码块整块丢弃（念代码没有意义）
+    t = t.replace(/```[\s\S]*?```/g, ' ');
+    t = t.replace(/~~~[\s\S]*?~~~/g, ' ');
+    // 2. 行内代码保留内容
+    t = t.replace(/`([^`]+)`/g, '$1');
+    // 3. 图片 → 替代文字；链接 → 只念文字
+    t = t.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+    t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    // 4. 裸 URL → 「链接」
+    t = t.replace(/https?:\/\/\S+/g, '链接');
+    // 5. 表格：丢掉分隔行，其余单元格用「，」连接
+    t = t.split('\n').map(function(line){
+      if (/^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line) && line.indexOf('-') >= 0) return '';
+      if (line.indexOf('|') >= 0) {
+        var cells = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|')
+                        .map(function(c){ return c.trim(); })
+                        .filter(function(c){ return c.length; });
+        return cells.join('，') + '。';
+      }
+      return line;
+    }).join('\n');
+    // 6. 标题 / 引用 / 列表符号 / 分隔线
+    t = t.replace(/^\s{0,3}#{1,6}\s*/gm, '');
+    t = t.replace(/^\s{0,3}>\s?/gm, '');
+    t = t.replace(/^\s{0,3}[-*+]\s+/gm, '');
+    t = t.replace(/^\s{0,3}\d+[.)]\s+/gm, '');
+    t = t.replace(/^\s{0,3}([-*_])\s*(\1\s*){2,}$/gm, '');
+    // 7. 强调符号
+    t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
+    t = t.replace(/__([^_]+)__/g, '$1');
+    t = t.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1$2');
+    t = t.replace(/(^|[^_])_([^_\n]+)_/g, '$1$2');
+    t = t.replace(/~~([^~]+)~~/g, '$1');
+    // 8. 压缩空白
+    t = t.replace(/[ \t]+/g, ' ');
+    t = t.replace(/\n{2,}/g, '\n');
+    t = t.replace(/^\s+|\s+$/g, '');
+    return t;
+  }
+
+  var SAMPLE_MD = [
+    '## 任务完成',
+    '',
+    '我已经把 config.json 更新好了，**新增了两个字段**。',
+    '',
+    '| 字段 | 类型 | 默认值 |',
+    '|---|---|---|',
+    '| enabled | boolean | true |',
+    '| timeout | number | 30 |',
+    '',
+    '```js',
+    'console.log("这段代码不会被朗读");',
+    '```',
+    '',
+    '详见 [设计文档](https://example.com/doc) 或 https://example.com/raw'
+  ].join(String.fromCharCode(10));
+
+  // ---------- 语音 ----------
+  function refreshVoices(){
+    if (!synth) { renderEngine(); return; }
+    voices = synth.getVoices() || [];
+    if (voices.length) populate();
+    renderEngine();
+  }
+
+  function zhVoices(){
+    var zh = voices.filter(function(v){ return /^zh/i.test(v.lang || ''); });
+    return zh.length ? zh : voices;
+  }
+
+  function populate(){
+    var sel = $('voice');
+    if (!sel || sel.dataset.ready === '1') return;
+    var list = zhVoices();
+    sel.innerHTML = '';
+    list.forEach(function(v, i){
+      var o = document.createElement('option');
+      o.value = String(voices.indexOf(v));
+      o.textContent = v.name + '  ·  ' + v.lang + (v.localService ? '  ·  离线' : '  ·  在线');
+      sel.appendChild(o);
+    });
+    if (list.length) sel.selectedIndex = 0;
+    sel.dataset.ready = '1';
+  }
+
+  function renderEngine(){
+    var el = $('engineStatus');
+    if (!el) return;
+    if (!synth) {
+      el.innerHTML = '<span class="bad">✗ 此环境不支持 speechSynthesis，无法试听。</span>';
+      return;
+    }
+    var zh = voices.filter(function(v){ return /^zh/i.test(v.lang || ''); });
+    var html = '<b>speechSynthesis：</b>可用　　<b>本机语音总数：</b>' + voices.length +
+               '　　<b>中文语音：</b>' + zh.length;
+    if (zh.length) {
+      html += '<br><b>中文音色：</b>' + zh.map(function(v){
+        return v.name.replace(/^Microsoft\s+/, '').replace(/\s*-\s*Chinese.*$/i, '') +
+               (v.localService ? '（离线）' : '（在线）');
+      }).join('　·　');
+    } else {
+      html += '<br><span class="warn">⚠ 未检测到中文语音，将回退到其他语言音色。</span>';
+    }
+    el.innerHTML = html;
+  }
+
+  function pickVoice(){
+    var sel = $('voice');
+    if (!sel || sel.value === '') return null;
+    return voices[Number(sel.value)] || null;
+  }
+
+  function speak(text, opts, done){
+    if (!synth) { if (done) done(); return; }
+    var u = new SpeechSynthesisUtterance(String(text));
+    var v = pickVoice();
+    if (v) u.voice = v;
+    u.lang = (v && v.lang) || 'zh-CN';
+    u.pitch = Number((opts && opts.pitch) != null ? opts.pitch : $('pitch').value);
+    u.rate  = Number((opts && opts.rate)  != null ? opts.rate  : $('rate').value);
+    u.volume= Number((opts && opts.volume)!= null ? opts.volume: $('volume').value);
+    u.onstart = function(){ setEq(true); };
+    u.onend = function(){ setEq(false); if (done) done(); };
+    u.onerror = function(){ setEq(false); if (done) done(); };
+    current = u;
+    synth.speak(u);
+  }
+
+  function setEq(on){
+    var eq = $('eq');
+    if (!eq) return;
+    if (on) eq.classList.add('on'); else eq.classList.remove('on');
+  }
+
+  function stopAll(){
+    seqToken++;
+    if (synth) synth.cancel();
+    setEq(false);
+  }
+
+  function speakOnce(){
+    stopAll();
+    speak($('text').value);
+  }
+
+  // ---------- 预设 ----------
+  var PRESETS = [1.0, 1.2, 1.4, 1.6, 1.7, 1.8, 2.0];
+
+  function buildPresets(){
+    var box = $('presets');
+    if (!box) return;
+    PRESETS.forEach(function(p){
+      var b = document.createElement('button');
+      b.textContent = p.toFixed(2) + (p === 1.0 ? ' 原声' : p === 1.7 ? ' 汤姆味' : '');
+      b.dataset.pitch = String(p);
+      b.onclick = function(){
+        stopAll();
+        $('pitch').value = String(p);
+        syncLabels();
+        markPreset(p);
+        speak($('text').value, { pitch: p });
+      };
+      box.appendChild(b);
+    });
+    markPreset(1.7);
+  }
+
+  function markPreset(p){
+    var box = $('presets');
+    if (!box) return;
+    Array.prototype.forEach.call(box.children, function(b){
+      if (Math.abs(Number(b.dataset.pitch) - p) < 1e-6) b.classList.add('on');
+      else b.classList.remove('on');
+    });
+  }
+
+  function syncLabels(){
+    $('pitchVal').textContent = Number($('pitch').value).toFixed(2);
+    $('rateVal').textContent  = Number($('rate').value).toFixed(2);
+    $('volVal').textContent   = Number($('volume').value).toFixed(2);
+  }
+
+  function runSequence(){
+    stopAll();
+    var token = ++seqToken;
+    var shortText = '我是布丁，这是变声对比。';
+    var i = 0;
+    function next(){
+      if (token !== seqToken || i >= PRESETS.length) { setEq(false); return; }
+      var p = PRESETS[i++];
+      $('pitch').value = String(p);
+      syncLabels();
+      markPreset(p);
+      speak(shortText, { pitch: p }, function(){
+        setTimeout(function(){
+          if (token === seqToken) next();
+        }, 260);
+      });
+    }
+    next();
+  }
+
+  // ---------- 绑定 ----------
+  function init(){
+    $('rawMd').textContent = SAMPLE_MD;
+    $('cleanMd').textContent = cleanMarkdown(SAMPLE_MD);
+
+    ['pitch','rate','volume'].forEach(function(id){
+      var el = $(id);
+      el.addEventListener('input', function(){
+        syncLabels();
+        if (id === 'pitch') markPreset(Number(el.value));
+      });
+    });
+
+    $('play').onclick = speakOnce;
+    $('stop').onclick = stopAll;
+    $('sequence').onclick = runSequence;
+    $('reset').onclick = function(){
+      stopAll();
+      $('pitch').value = '1.7';
+      $('rate').value = '1.05';
+      $('volume').value = '1';
+      syncLabels(); markPreset(1.7);
+    };
+    $('playClean').onclick = function(){
+      stopAll();
+      speak(cleanMarkdown(SAMPLE_MD));
+    };
+
+    buildPresets();
+    syncLabels();
+
+    if (synth) {
+      refreshVoices();
+      synth.addEventListener('voiceschanged', refreshVoices);
+      // 某些实现 voiceschanged 不触发，兜底轮询几次
+      var tries = 0;
+      var t = setInterval(function(){
+        tries++;
+        if ((synth.getVoices() || []).length || tries > 12) {
+          clearInterval(t);
+          refreshVoices();
+        }
+      }, 250);
+    } else {
+      renderEngine();
+    }
+
+    window.addEventListener('beforeunload', stopAll);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  // 供无头环境断言
+  window.__VOICE_LAB__ = {
+    cleanMarkdown: cleanMarkdown,
+    voiceCount: function(){ return voices.length; },
+    pitch: function(){ return Number($('pitch').value); }
+  };
+})();
+</script>
+</body>
+</html>

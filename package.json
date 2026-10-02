@@ -1,0 +1,40 @@
+{
+  "name": "dsh-pudding-pet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "布丁桌宠：一只住在 DSH 窗口里的猫，会读你的回复、用搞怪升调复述，可拖动、可换形象。",
+  "icon": "./assets/icon.svg",
+  "license": "MIT",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/en.json": "./locale/en.json",
+    "./locale/zh.json": "./locale/zh.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "assets",
+    "locale",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  },
+  "meta": {
+    "title": "布丁桌宠",
+    "description": "一只住在窗口里的猫：朗读助手回复、搞怪变声、可拖动、形象可替换。"
+  }
+}

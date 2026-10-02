@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="cat is-idle"
+     role="img" aria-label="布丁 (Pudding) — 原创卡通猫咪桌宠"
+     stroke-linejoin="round" stroke-linecap="round">
+  <!--
+    布丁 / Pudding — an original cartoon cat for the DSH desktop-pet plugin.
+    Copyright waived (CC0-1.0). See LICENSE-ASSETS.md.
+    NOT affiliated with, derived from, or imitating Outfit7's "Talking Tom".
+
+    Structure (all parts addressable by class, ids kept for readability):
+      .stage                     whole-body wrapper (poke squash / happy bounce)
+        .shadow                  ground shadow
+        .tail                    tail (id: tail)
+        .body  .haunch .torso .chest
+        .scarf                   mint scarf
+        .head                    head group (id: head) — tilts
+          .ear-l .ear-r .ear-inner
+          .cap .mark             caramel head cap + cream star mark
+          .eye-l .eye-r          each: .sclera .gaze-state > .gaze-track(iris/pupil/glint) .lid .lash
+          .brow-l .brow-r
+          .muzzle .nose .blush
+          .mouth-closed / .mouth-open(.jaw>.tongue) / .mouth-smile / .mouth-frown / .mouth-flat / .mouth-sleep
+        .leg-l .leg-r            front legs (raised for `waiting`, typing for `work`)
+        .fx                      .zzz .sparkle .dots .surprise .tear .work-mark
+  -->
+  <defs>
+    <clipPath id="catClipHead"><ellipse cx="100" cy="78" rx="48" ry="43"/></clipPath>
+    <clipPath id="catClipEyeL"><ellipse cx="79" cy="70" rx="15" ry="15.5"/></clipPath>
+    <clipPath id="catClipEyeR"><ellipse cx="121" cy="70" rx="15" ry="15.5"/></clipPath>
+    <clipPath id="catClipMouth"><ellipse cx="100" cy="109" rx="10.5" ry="8.5"/></clipPath>
+  </defs>
+
+  <g class="stage" id="stage">
+
+    <!-- ground shadow -->
+    <ellipse class="shadow" id="shadow" cx="100" cy="189" rx="56" ry="8" fill="#2B1B14" opacity="0.13"/>
+
+    <!-- ============ tail ============ -->
+    <g class="tail" id="tail">
+      <path class="ink-stroke" d="M 130 178 C 156 182 176 168 176 146 C 176 128 164 118 150 120"
+            fill="none" stroke="#4A342A" stroke-width="21"/>
+      <path class="patch-stroke" d="M 130 178 C 156 182 176 168 176 146 C 176 128 164 118 150 120"
+            fill="none" stroke="#E8A85C" stroke-width="15"/>
+      <path class="fur-light-stroke" d="M 172.02 130.21 C 167.36 122.47 159.1 118.7 150 120"
+            fill="none" stroke="#FFF6E6" stroke-width="15"/>
+    </g>
+
+    <!-- ============ body ============ -->
+    <g class="body" id="body">
+      <ellipse class="haunch fur" cx="52" cy="164" rx="21" ry="23" fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+      <ellipse class="haunch fur" cx="148" cy="164" rx="21" ry="23" fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+      <path class="torso fur" d="M 100 104 C 126 104 144 128 146 156 C 148 178 132 188 100 188
+                                 C 68 188 52 178 54 156 C 56 128 74 104 100 104 Z"
+            fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+      <path class="chest fur-light" d="M 100 112 C 118 112 128 132 128 154 C 128 174 116 184 100 184
+                                        C 84 184 72 174 72 154 C 72 132 82 112 100 112 Z"
+            fill="#FFF6E6"/>
+    </g>
+
+    <!-- ============ scarf (mint, identity accent) ============ -->
+    <g class="scarf" id="scarf">
+      <path class="scarf-band" d="M 70 112 Q 100 128 130 112 Q 132 126 100 142 Q 68 126 70 112 Z"
+            fill="#4FB6A6" stroke="#4A342A" stroke-width="3"/>
+      <ellipse class="scarf-knot" cx="100" cy="136" rx="10" ry="8"
+               fill="#3E9C8D" stroke="#4A342A" stroke-width="3"/>
+    </g>
+
+    <!-- ============ head ============ -->
+    <g class="head" id="head">
+
+      <!-- ears (behind head) -->
+      <g class="ear ear-l" id="ear-left">
+        <path class="fur-patch" d="M 94 38 L 54.95 11.38 Q 50 8 50.74 13.95 L 56 56 Z"
+              fill="#E8A85C" stroke="#4A342A" stroke-width="3"/>
+        <path class="ear-inner" d="M 56.67 18.4 L 83.07 36.4 L 60.27 47.2 Z" fill="#F7B8AE"/>
+      </g>
+      <g class="ear ear-r" id="ear-right">
+        <path class="fur-patch" d="M 106 38 L 145.05 11.38 Q 150 8 149.26 13.95 L 144 56 Z"
+              fill="#E8A85C" stroke="#4A342A" stroke-width="3"/>
+        <path class="ear-inner" d="M 143.33 18.4 L 116.93 36.4 L 139.73 47.2 Z" fill="#F7B8AE"/>
+      </g>
+
+      <!-- head shell -->
+      <ellipse class="head-shape fur" cx="100" cy="78" rx="48" ry="43"
+               fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+      <!-- caramel cap -->
+      <!-- cap bottom edge is kept above y≈49 so it never crosses the eyes
+           (the closed-eyelid rect is clipped to the eye ellipse, top y=54.5) -->
+      <path class="cap" clip-path="url(#catClipHead)"
+            d="M 46 82 C 46 44 70 26 100 26 C 130 26 154 44 154 82
+               C 144 58 124 46 100 46 C 76 46 56 58 46 82 Z"
+            fill="#E8A85C"/>
+      <!-- cream four-point star marking (signature) -->
+      <path class="mark" d="M 100 29 Q 102 35 108 37 Q 102 39 100 45 Q 98 39 92 37 Q 98 35 100 29 Z"
+            fill="#FFF6E6"/>
+
+      <!-- muzzle -->
+      <ellipse class="muzzle fur-light" cx="100" cy="104" rx="27" ry="16" fill="#FFF6E6"/>
+
+      <!-- eyes -->
+      <g class="eye eye-l" id="eye-left">
+        <ellipse class="sclera" cx="79" cy="70" rx="15" ry="15.5"
+                 fill="#FFFFFF" stroke="#4A342A" stroke-width="2.6"/>
+        <g clip-path="url(#catClipEyeL)">
+          <g class="gaze-state">
+            <g class="gaze-track">
+              <circle class="iris" cx="79" cy="70" r="10.5" fill="#3E7C8F"/>
+              <ellipse class="pupil" cx="79" cy="70" rx="4.6" ry="7.6" fill="#241A16"/>
+              <circle class="glint" cx="75.2" cy="66.4" r="3.1" fill="#FFFFFF"/>
+              <circle class="glint2" cx="82.6" cy="75.4" r="1.6" fill="#FFFFFF" opacity="0.7"/>
+            </g>
+          </g>
+          <rect class="lid" x="62" y="52" width="34" height="36" fill="#FFE9C9"/>
+          <path class="lash lash-blink" d="M 66 72 Q 79 77 92 72" fill="none" stroke="#4A342A" stroke-width="2.8" opacity="0"/>
+          <path class="lash lash-happy" d="M 66 76 Q 79 64 92 76" fill="none" stroke="#4A342A" stroke-width="2.8" opacity="0"/>
+          <path class="lash lash-sleep" d="M 66 68 Q 79 78 92 68" fill="none" stroke="#4A342A" stroke-width="2.8" opacity="0"/>
+        </g>
+        <!-- crisp rim redrawn above the iris (clipping would otherwise shave it) -->
+        <ellipse class="eye-rim" cx="79" cy="70" rx="15" ry="15.5"
+                 fill="none" stroke="#4A342A" stroke-width="2.6"/>
+      </g>
+      <g class="eye eye-r" id="eye-right">
+        <ellipse class="sclera" cx="121" cy="70" rx="15" ry="15.5"
+                 fill="#FFFFFF" stroke="#4A342A" stroke-width="2.6"/>
+        <g clip-path="url(#catClipEyeR)">
+          <g class="gaze-state">
+            <g class="gaze-track">
+              <circle class="iris" cx="121" cy="70" r="10.5" fill="#3E7C8F"/>
+              <ellipse class="pupil" cx="121" cy="70" rx="4.6" ry="7.6" fill="#241A16"/>
+              <circle class="glint" cx="117.2" cy="66.4" r="3.1" fill="#FFFFFF"/>
+              <circle class="glint2" cx="124.6" cy="75.4" r="1.6" fill="#FFFFFF" opacity="0.7"/>
+            </g>
+          </g>
+          <rect class="lid" x="104" y="52" width="34" height="36" fill="#FFE9C9"/>
+          <path class="lash lash-blink" d="M 108 72 Q 121 77 134 72" fill="none" stroke="#4A342A" stroke-width="2.8" opacity="0"/>
+          <path class="lash lash-happy" d="M 108 76 Q 121 64 134 76" fill="none" stroke="#4A342A" stroke-width="2.8" opacity="0"/>
+          <path class="lash lash-sleep" d="M 108 68 Q 121 78 134 68" fill="none" stroke="#4A342A" stroke-width="2.8" opacity="0"/>
+        </g>
+        <ellipse class="eye-rim" cx="121" cy="70" rx="15" ry="15.5"
+                 fill="none" stroke="#4A342A" stroke-width="2.6"/>
+      </g>
+
+      <!-- brows -->
+      <path class="brow brow-l" d="M 68 52 Q 79 47 90 51" fill="none" stroke="#4A342A" stroke-width="2.4" opacity="0"/>
+      <path class="brow brow-r" d="M 110 51 Q 121 47 132 52" fill="none" stroke="#4A342A" stroke-width="2.4" opacity="0"/>
+
+      <!-- blush -->
+      <ellipse class="blush" cx="66" cy="94" rx="10" ry="6" fill="#F79A86" opacity="0.38"/>
+      <ellipse class="blush" cx="134" cy="94" rx="10" ry="6" fill="#F79A86" opacity="0.38"/>
+
+      <!-- nose -->
+      <path class="nose" d="M 93.5 92 L 106.5 92 Q 108.5 92 107.3 93.6 L 101.6 101
+                             Q 100 103 98.4 101 L 92.7 93.6 Q 91.5 92 93.5 92 Z"
+            fill="#F2907E"/>
+
+      <!-- mouths (exactly one visible per state) -->
+      <g class="mouth mouth-closed" id="mouth-closed" opacity="1">
+        <path d="M 100 102 L 100 105.5" fill="none" stroke="#4A342A" stroke-width="2.6"/>
+        <path d="M 100 105.5 C 100 111 95.8 113 91.5 109.8" fill="none" stroke="#4A342A" stroke-width="2.6"/>
+        <path d="M 100 105.5 C 100 111 104.2 113 108.5 109.8" fill="none" stroke="#4A342A" stroke-width="2.6"/>
+      </g>
+      <g class="mouth mouth-open" id="mouth-open" opacity="0">
+        <g class="jaw">
+          <g clip-path="url(#catClipMouth)">
+            <ellipse class="mouth-inner" cx="100" cy="109" rx="10" ry="7.5" fill="#7A3B36"/>
+            <ellipse class="tongue" cx="100" cy="114.5" rx="6.5" ry="4.5" fill="#F2907E"/>
+          </g>
+        </g>
+      </g>
+      <path class="mouth mouth-smile" d="M 87 105 Q 100 117 113 105" fill="none" stroke="#4A342A" stroke-width="3.2" opacity="0"/>
+      <path class="mouth mouth-frown" d="M 91 112 Q 100 105 109 112" fill="none" stroke="#4A342A" stroke-width="3.2" opacity="0"/>
+      <path class="mouth mouth-flat" d="M 92 108 Q 100 111 108 108" fill="none" stroke="#4A342A" stroke-width="3" opacity="0"/>
+      <ellipse class="mouth mouth-sleep" cx="100" cy="108" rx="4.5" ry="3.8" fill="#7A3B36" opacity="0"/>
+
+      <!-- tear (sad) -->
+      <path class="tear" d="M 70 88 Q 77 97 77 101 Q 77 106 70 106 Q 63 106 63 101 Q 63 97 70 88 Z"
+            fill="#7FC8E8" opacity="0"/>
+    </g>
+
+    <!-- ============ front legs ============ -->
+    <g class="leg leg-l" id="leg-left">
+      <rect class="fur" x="70" y="138" width="20" height="48" rx="9"
+            fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+      <path class="paw-line" d="M 76 172 L 76 182 M 84 172 L 84 182"
+            fill="none" stroke="#4A342A" stroke-width="2"/>
+    </g>
+    <g class="leg leg-r" id="leg-right">
+      <rect class="fur" x="110" y="138" width="20" height="48" rx="9"
+            fill="#FFE9C9" stroke="#4A342A" stroke-width="3"/>
+      <path class="paw-line" d="M 116 172 L 116 182 M 124 172 L 124 182"
+            fill="none" stroke="#4A342A" stroke-width="2"/>
+    </g>
+
+    <!-- ============ effects ============ -->
+    <g class="fx" id="fx">
+      <!-- sleep: snore bubbles -->
+      <g class="zzz" id="zzz" opacity="0">
+        <path class="z z1" d="M 152 40 L 164 40 L 152 54 L 164 54" fill="none" stroke="#3E9C8D" stroke-width="3.6"/>
+        <path class="z z2" d="M 162 26 L 172 26 L 162 38 L 172 38" fill="none" stroke="#3E9C8D" stroke-width="3.2"/>
+        <path class="z z3" d="M 170 12 L 178 12 L 170 22 L 178 22" fill="none" stroke="#3E9C8D" stroke-width="2.8"/>
+      </g>
+      <!-- happy: sparkles -->
+      <g class="sparkles" id="sparkles" opacity="0">
+        <path class="sparkle s1" d="M 40 33 Q 42 39 48 41 Q 42 43 40 49 Q 38 43 32 41 Q 38 39 40 33 Z" fill="#F2C14E"/>
+        <path class="sparkle s2" d="M 162 40 Q 163.5 45 168 46.5 Q 163.5 48 162 53 Q 160.5 48 156 46.5 Q 160.5 45 162 40 Z" fill="#F2C14E"/>
+        <path class="sparkle s3" d="M 152 10 Q 153.5 15 158 16.5 Q 153.5 18 152 23 Q 150.5 18 146 16.5 Q 150.5 15 152 10 Z" fill="#F2C14E"/>
+      </g>
+      <!-- think: thought dots -->
+      <g class="dots" id="dots" opacity="0">
+        <circle class="dot d1" cx="142" cy="60" r="2.6" fill="#4FB6A6"/>
+        <circle class="dot d2" cx="153" cy="52" r="3.8" fill="#4FB6A6"/>
+        <circle class="dot d3" cx="166" cy="42" r="5" fill="#4FB6A6"/>
+      </g>
+      <!-- poke: surprise mark -->
+      <g class="surprise" id="surprise" opacity="0">
+        <path d="M 43 22 L 49 22 L 47 38 L 45 38 Z" fill="#F2C14E" stroke="#4A342A" stroke-width="2"/>
+        <circle cx="46" cy="45" r="2.8" fill="#F2C14E" stroke="#4A342A" stroke-width="2"/>
+      </g>
+      <!-- work: motion marks -->
+      <g class="work-marks" id="work-marks" opacity="0">
+        <path class="wm wm-l" d="M 58 158 Q 62 164 58 170" fill="none" stroke="#4FB6A6" stroke-width="3"/>
+        <path class="wm wm-r" d="M 142 158 Q 138 164 142 170" fill="none" stroke="#4FB6A6" stroke-width="3"/>
+      </g>
+    </g>
+
+  </g>
+</svg>

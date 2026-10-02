@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>布丁插件 · 本地契约测试</title>
+<style>
+  html,body{margin:0;height:100%;background:#1b1c1e;color:#e8eaed;
+    font:13px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  /* Mimic DSH's overlay layer: full-viewport, click-through by default. */
+  #overlay{position:absolute;inset:0;z-index:20;pointer-events:none}
+  #out{position:absolute;left:12px;top:12px;max-width:660px;z-index:99;
+    background:#232427;border:1px solid #3a3d42;border-radius:9px;padding:12px 14px;
+    font-family:ui-monospace,Consolas,monospace;font-size:11.5px;white-space:pre-wrap;color:#a3a8b0}
+  .ok{color:#7ddba8}.bad{color:#e06c75}
+</style>
+</head>
+<body>
+<div id="overlay"></div>
+<pre id="out">running…</pre>
+
+<script>
+// ---------------------------------------------------------------------------
+// Stand-in for the parts of DSH this plugin touches: module loader, React
+// (two-phase, so effects really commit), slots, locale, and a fake session
+// event window. Enough to exercise the real plugin code in a real browser.
+// ---------------------------------------------------------------------------
+(function () {
+  var results = [];
+  function check(name, pass, detail) {
+    results.push({ name: name, pass: !!pass, detail: detail || '' });
+  }
+
+  // --- fake session event window ------------------------------------------
+  var fakeEvents = [];
+  var subscribers = new Set();
+  var eventSource = {
+    getSnapshot: function () {
+      return { entries: fakeEvents.slice(), revision: fakeEvents.length, hasMore: false };
+    },
+    subscribe: function (fn) { subscribers.add(fn); return function () { subscribers.delete(fn); }; }
+  };
+  function pushEvent(type, data) {
+    fakeEvents.push({ type: 'event', event: { seq: fakeEvents.length, type: type, data: data } });
+    subscribers.forEach(function (fn) { try { fn(); } catch (e) {} });
+  }
+
+  var retained = [];
+  var sessionsService = {
+    list: { getSnapshot: function () { return { byId: { 'sess-1': { id: 'sess-1', retainedBy: { mainView: 1 } } }, current: 'sess-1' }; } },
+    retain: function (id, opts) {
+      retained.push({ id: id, opts: opts });
+      return {
+        ready: Promise.resolve(),
+        binding: { session: { eventSource: eventSource } },
+        release: function () { check('reference.release called on dispose', true); }
+      };
+    }
+  };
+
+  var localeService = {
+    getSnapshot: function () { return { active: 'zh' }; },
+    subscribe: function () { return function () {}; }
+  };
+
+  var slotRegistrations = [];
+  // The real `slots.inject(key, callback)` only runs the callback once the slot
+  // is declared by an owning entry, so this stand-in declares it up front.
+  var declaredSlots = { 'shell.overlay': true };
+  var slotsService = {
+    inject: function (key, callback) {
+      if (!declaredSlots[key]) return function () {};
+      var dispose = callback();
+      return typeof dispose === 'function' ? dispose : function () {};
+    },
+    register: function (options, component) {
+      slotRegistrations.push({ options: options, component: component });
+      return function () {};
+    }
+  };
+
+  var ctx = {
+    get: function (name) { return { sessions: sessionsService, slots: slotsService, locale: localeService }[name]; },
+    effect: function (fn) { ctx._effects.push(fn); return fn; },
+    _effects: []
+  };
+  // DSH exposes injected services as direct properties too; shipped plugins use
+  // that form (`ctx.slots.inject(...)`).
+  ctx.slots = slotsService;
+  ctx.locale = localeService;
+  ctx.sessions = sessionsService;
+
+  // --- two-phase React shim ------------------------------------------------
+  var pendingRefs = [];
+  var pendingEffects = [];
+  var React = {
+    createElement: function (type, props) {
+      if (typeof type === 'function') return type(props || {});
+      return { type: type, props: props || {} };
+    },
+    useRef: function (initial) {
+      var ref = { current: initial };
+      pendingRefs.push(ref);
+      return ref;
+    },
+    useEffect: function (fn) { pendingEffects.push(fn); }
+  };
+
+  window.__ModuleLoader__ = {
+    load: function (def) {
+      check('module registered with expected id', def.id === 'dsh-pudding-pet', def.id);
+      check('factory is a function', typeof def.factory === 'function');
+      var mod = def.factory(function (name) {
+        if (name === 'react') return React;
+        throw new Error('unexpected require: ' + name);
+      });
+      window.__PUDDING_EXPORTS__ = mod;
+    }
+  };
+
+  window.__TEST_HOOKS__ = {
+    ctx: ctx, pushEvent: pushEvent, check: check, results: results,
+    slots: slotRegistrations, retained: retained,
+    pendingRefs: pendingRefs, pendingEffects: pendingEffects
+  };
+})();
+</script>
+
+<!-- the real plugin bundle, built from lib/client.template.js -->
+<script src="../lib/client.js"></script>
+
+<script>
+(function () {
+  var H = window.__TEST_HOOKS__;
+  var check = H.check;
+  var exports = window.__PUDDING_EXPORTS__;
+
+  check('exports.apply exists', exports && typeof exports.apply === 'function');
+  check('exports.inject declares slots+locale',
+    exports && exports.inject && exports.inject.indexOf('slots') >= 0 && exports.inject.indexOf('locale') >= 0,
+    JSON.stringify(exports && exports.inject));
+
+  try {
+    exports.apply(H.ctx);
+    check('apply() did not throw', true);
+  } catch (error) {
+    check('apply() did not throw', false, String(error && error.message));
+  }
+
+  var reg = H.slots.filter(function (r) { return r.options.name === 'shell.overlay'; });
+  check('registered one shell.overlay entry', reg.length === 1, 'count=' + reg.length);
+  check('overlay entry id is pudding-pet', !!(reg[0] && reg[0].options.id === 'pudding-pet'));
+
+  // --- commit the component the way React would ---------------------------
+  var host = document.getElementById('overlay');
+  var slotHost = document.createElement('div');
+  host.appendChild(slotHost);
+
+  H.pendingRefs.length = 0;
+  H.pendingEffects.length = 0;
+
+  try {
+    check('overlay component renders', !!reg[0].component({}));
+  } catch (error) {
+    check('overlay component renders', false, String(error && error.message));
+  }
+
+  check('component used exactly one ref', H.pendingRefs.length === 1, 'refs=' + H.pendingRefs.length);
+  check('component registered one effect', H.pendingEffects.length === 1, 'effects=' + H.pendingEffects.length);
+
+  if (H.pendingRefs[0]) H.pendingRefs[0].current = slotHost;
+  try {
+    H.pendingEffects.forEach(function (fn) { fn(); });
+    check('mount effect ran without throwing', true);
+  } catch (error) {
+    check('mount effect ran without throwing', false, String(error && error.message));
+  }
+
+  // Speech must not actually play during the test; capture instead.
+  var spoke = [];
+  var synth = window.speechSynthesis;
+  if (synth) {
+    synth.speak = function (u) {
+      spoke.push(u.text);
+      setTimeout(function () { if (u.onend) u.onend(); }, 0);
+    };
+    synth.cancel = function () {};
+  }
+
+  var SENTENCE = '你好，这是一条回复。第二句在这里！';
+  var TABLE_REPLY = '## 标题\n\n有 `代码` 和 **加粗**。\n\n```js\nvar a=1;\n```\n\n| A | B |\n|---|---|\n| 1 | 2 |';
+
+  setTimeout(function () {
+    check('window.PuddingCat published by baked artwork', !!window.PuddingCat);
+    check('sessions.retain was called', H.retained.length === 1, 'count=' + H.retained.length);
+    check('retain used a named source',
+      !!(H.retained[0] && H.retained[0].opts && H.retained[0].opts.source),
+      String(H.retained[0] && H.retained[0].opts && H.retained[0].opts.source));
+
+    var root = document.querySelector('[data-pudding-pet="root"]');
+    check('pet root element mounted', !!root);
+    if (root) {
+      var style = getComputedStyle(root);
+      // The root spans the viewport, so it must stay click-through; the cat
+      // itself is the only part that opts into pointer events.
+      check('pet root stays click-through', style.pointerEvents === 'none', style.pointerEvents);
+      check('pet root is fixed-positioned', style.position === 'fixed', style.position);
+      var catEl = root.querySelector('.pudding-cat');
+      check('cat body opts into pointer events',
+        !!catEl && getComputedStyle(catEl).pointerEvents === 'auto',
+        catEl ? getComputedStyle(catEl).pointerEvents : '(no cat)');
+      var svg = root.querySelector('svg.cat');
+      check('pudding svg present', !!svg);
+      if (svg) check('svg starts idle', svg.classList.contains('is-idle'), String(svg.className.baseVal || svg.className));
+    }
+    check('artwork stylesheet injected', !!document.getElementById('dsh-pudding-pet-artwork'));
+    check('chrome stylesheet injected', !!document.getElementById('dsh-pudding-pet-chrome'));
+
+    // --- assistant reply reaches speech ---------------------------------
+    H.pushEvent('assistant/message', { stream: SENTENCE });
+
+    setTimeout(function () {
+      check('assistant reply reached speech', spoke.length > 0, JSON.stringify(spoke).slice(0, 160));
+      // `assistant/message` carries a whole reply, so it is spoken as one unit;
+      // sentence splitting applies to the streaming `assistant/chunk` path.
+      check('whole reply spoken as one unit', spoke.length === 1, 'count=' + spoke.length);
+      check('reply text preserved', spoke[0] === SENTENCE, String(spoke[0]));
+
+      var beforeUser = spoke.length;
+      H.pushEvent('user/message', { stream: '这是我说的话。' });
+
+      setTimeout(function () {
+        check('user text silent by default (readInput=false)',
+          spoke.length === beforeUser, 'before=' + beforeUser + ' after=' + spoke.length);
+
+        var mark = spoke.length;
+        H.pushEvent('assistant/message', { stream: TABLE_REPLY });
+
+        // The queue speaks one sentence at a time; wait for it to drain.
+        setTimeout(function () {
+          var added = spoke.slice(mark).join(' ');
+          check('new reply was spoken', spoke.length > mark, 'added=' + (spoke.length - mark));
+          check('code block not spoken', added.indexOf('var a=1') < 0, added.slice(0, 90));
+          check('heading marker removed', added.indexOf('##') < 0);
+          check('bold markers removed', added.indexOf('**') < 0);
+          check('backticks removed', added.indexOf('`') < 0);
+          check('table cells joined with a comma', added.indexOf('1，2') >= 0, added.slice(0, 160));
+
+          // --- dispose path ---------------------------------------------
+          try {
+            H.ctx._effects.forEach(function (fn) { var c = fn(); if (typeof c === 'function') c(); });
+            check('teardown ran without throwing', true);
+          } catch (error) {
+            check('teardown ran without throwing', false, String(error && error.message));
+          }
+          check('pet root removed on dispose', !document.querySelector('[data-pudding-pet="root"]'));
+
+          var passed = H.results.filter(function (r) { return r.pass; }).length;
+          var failed = H.results.length - passed;
+          document.getElementById('out').innerHTML =
+            H.results.map(function (r) {
+              return (r.pass ? '<span class="ok">PASS</span> ' : '<span class="bad">FAIL</span> ') +
+                r.name + (r.detail ? '  <span style="opacity:.6">(' + r.detail + ')</span>' : '');
+            }).join('\n') +
+            '\n\n' + (failed ? '<span class="bad">' : '<span class="ok">') +
+            'pass=' + passed + ' fail=' + failed + '</span>';
+          document.title = 'RESULT:' + JSON.stringify({ pass: passed, fail: failed });
+        }, 1400);
+      }, 200);
+    }, 250);
+  }, 500);
+})();
+</script>
+</body>
+</html>
