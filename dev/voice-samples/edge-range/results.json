@@ -1,0 +1,300 @@
+{
+  "voice": "zh-CN-XiaoyiNeural",
+  "text": "你好呀，我是布丁。今天想陪你一起干活。",
+  "results": [
+    {
+      "group": "Hz",
+      "param": "+0Hz",
+      "pitch": "+0Hz",
+      "bytes": 26928,
+      "sha": "9ce543433da195be",
+      "ok": true,
+      "error": "",
+      "file": "hz-p0Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+10Hz",
+      "pitch": "+10Hz",
+      "bytes": 26928,
+      "sha": "9901fa8999c0c047",
+      "ok": true,
+      "error": "",
+      "file": "hz-p10Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+20Hz",
+      "pitch": "+20Hz",
+      "bytes": 26928,
+      "sha": "28db83657fa925ae",
+      "ok": true,
+      "error": "",
+      "file": "hz-p20Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+30Hz",
+      "pitch": "+30Hz",
+      "bytes": 26928,
+      "sha": "9ebe2643d91ab83d",
+      "ok": true,
+      "error": "",
+      "file": "hz-p30Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+40Hz",
+      "pitch": "+40Hz",
+      "bytes": 26928,
+      "sha": "33369982b484d48e",
+      "ok": true,
+      "error": "",
+      "file": "hz-p40Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+50Hz",
+      "pitch": "+50Hz",
+      "bytes": 26928,
+      "sha": "0a9c04868c444bd6",
+      "ok": true,
+      "error": "",
+      "file": "hz-p50Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+60Hz",
+      "pitch": "+60Hz",
+      "bytes": 26928,
+      "sha": "c27379fe3710cea4",
+      "ok": true,
+      "error": "",
+      "file": "hz-p60Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+70Hz",
+      "pitch": "+70Hz",
+      "bytes": 27072,
+      "sha": "e959fb7a6a3b30c8",
+      "ok": true,
+      "error": "",
+      "file": "hz-p70Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+80Hz",
+      "pitch": "+80Hz",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "hz-p80Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+90Hz",
+      "pitch": "+90Hz",
+      "bytes": 26928,
+      "sha": "ce2e19aa95707975",
+      "ok": true,
+      "error": "",
+      "file": "hz-p90Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+100Hz",
+      "pitch": "+100Hz",
+      "bytes": 26928,
+      "sha": "ce2e19aa95707975",
+      "ok": true,
+      "error": "",
+      "file": "hz-p100Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+150Hz",
+      "pitch": "+150Hz",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "hz-p150Hz.mp3"
+    },
+    {
+      "group": "Hz",
+      "param": "+200Hz",
+      "pitch": "+200Hz",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "hz-p200Hz.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+0%",
+      "pitch": "+0%",
+      "bytes": 26928,
+      "sha": "9ce543433da195be",
+      "ok": true,
+      "error": "",
+      "file": "pct-p0%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+10%",
+      "pitch": "+10%",
+      "bytes": 26928,
+      "sha": "83fa9f86c468f99a",
+      "ok": true,
+      "error": "",
+      "file": "pct-p10%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+25%",
+      "pitch": "+25%",
+      "bytes": 26928,
+      "sha": "6b5e552eab786280",
+      "ok": true,
+      "error": "",
+      "file": "pct-p25%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+50%",
+      "pitch": "+50%",
+      "bytes": 0,
+      "sha": "",
+      "ok": false,
+      "error": "edge-tts: websocket upgrade refused (HTTP 503)",
+      "file": "pct-p50%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+75%",
+      "pitch": "+75%",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "pct-p75%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+100%",
+      "pitch": "+100%",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "pct-p100%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+150%",
+      "pitch": "+150%",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "pct-p150%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+200%",
+      "pitch": "+200%",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "pct-p200%.mp3"
+    },
+    {
+      "group": "百分比",
+      "param": "+300%",
+      "pitch": "+300%",
+      "bytes": 26928,
+      "sha": "abb5c66d668c2f0a",
+      "ok": true,
+      "error": "",
+      "file": "pct-p300%.mp3"
+    },
+    {
+      "group": "关键字",
+      "param": "x-low",
+      "pitch": "x-low",
+      "bytes": 26928,
+      "sha": "3ae2c30616c9faef",
+      "ok": true,
+      "error": "",
+      "file": "kw-xnlow.mp3"
+    },
+    {
+      "group": "关键字",
+      "param": "low",
+      "pitch": "low",
+      "bytes": 26928,
+      "sha": "e425a01576dc99d7",
+      "ok": true,
+      "error": "",
+      "file": "kw-low.mp3"
+    },
+    {
+      "group": "关键字",
+      "param": "medium",
+      "pitch": "medium",
+      "bytes": 26928,
+      "sha": "9ce543433da195be",
+      "ok": true,
+      "error": "",
+      "file": "kw-medium.mp3"
+    },
+    {
+      "group": "关键字",
+      "param": "high",
+      "pitch": "high",
+      "bytes": 26928,
+      "sha": "83fa9f86c468f99a",
+      "ok": true,
+      "error": "",
+      "file": "kw-high.mp3"
+    },
+    {
+      "group": "关键字",
+      "param": "x-high",
+      "pitch": "x-high",
+      "bytes": 26928,
+      "sha": "9ebe2643d91ab83d",
+      "ok": true,
+      "error": "",
+      "file": "kw-xnhigh.mp3"
+    },
+    {
+      "group": "负向",
+      "param": "-25Hz",
+      "pitch": "-25Hz",
+      "bytes": 26928,
+      "sha": "20aa8a299a3fa3e7",
+      "ok": true,
+      "error": "",
+      "file": "neg-n25Hz.mp3"
+    },
+    {
+      "group": "负向",
+      "param": "-50Hz",
+      "pitch": "-50Hz",
+      "bytes": 26928,
+      "sha": "729a90289a452e8c",
+      "ok": true,
+      "error": "",
+      "file": "neg-n50Hz.mp3"
+    }
+  ],
+  "summary": {
+    "Hz": "+90Hz",
+    "百分比": "+75%"
+  }
+}

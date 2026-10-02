@@ -1,0 +1,37 @@
+新增宿主侧语音合成（Edge TTS），变声可突破浏览器上限
+
+浏览器 speechSynthesis 的 pitch 上限是 2.0，且它的输出无法被捕获做
+后处理，所以「变声不够强」在纯浏览器方案下无解。
+
+本次改为宿主侧合成：
+
+- lib/edge-tts.js：vendored 的 Edge TTS 客户端（上游 MIT，
+  github.com/lemonhall/dsh-tts-reader）。只加了一个 provenance 头，
+  正文逐字节未改，SHA-256 记录在文件头。
+  必须宿主侧的原因：Edge 服务要求请求带当前浏览器的 User-Agent，
+  而浏览器无法在 WebSocket 上设置该头。
+
+- lib/index.js：新增两个 GET 路由
+    GET /pudding-pet/tts     合成（返回 MP3）
+    GET /pudding-pet/voices  音色目录
+  围栏与 dsh-speech-plugin 一致：仅 GET/HEAD、拒绝跨站、校验同源
+  Origin、本机校验。带结果缓存、参数钳制、失败冷却。
+
+- 客户端：新增宿主引擎与浏览器引擎两套，默认 auto。
+  宿主播 MP3 时可再叠加 playbackRate + preservesPitch=false，
+  这会在服务端音高上限之上继续变调。宿主失败自动降级浏览器，
+  不会静默失效。
+
+实测变声范围（dev/voice-samples/edge-range/）：
+  Hz 写法   最后一个有效值 +90Hz，+100Hz 起被钳制（且不单调）
+  百分比    最后一个有效值 +75%，+100% 起被钳制
+  关键字    x-low/low/medium/high/x-high 均有效
+  负向      -25Hz/-50Hz 可用（低沉嗓）
+滑杆上限据此设为 90Hz，避免停在无效区间。
+
+设置面板新增：引擎选择、Edge 音色、音高偏移、额外加速。
+宿主侧 503 期间会冷却 60s，期间直接走浏览器。
+
+测试：新增 dev/test-host-tts.mjs（21 项，含真实合成）
+与 dev/test-client-engine.mjs（11 项，含降级路径）。
+全部 77 项通过。

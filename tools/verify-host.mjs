@@ -1,4 +1,4 @@
-// Prove the host half satisfies Cordis's config contract.
+// Prove the host half satisfies Cordis's config contract and still loads.
 //
 // Cordis resolves a plugin's config as:
 //     if (!runtime.Config) return config;
@@ -6,12 +6,12 @@
 // so a plain JSON-Schema object crashes with
 //   "Cannot read properties of undefined (reading 'validate')".
 //
-// This checks both the old (broken) shape and the current one, so the
-// regression is explicit.
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { pathToFileURL } from 'node:url';
+// This is the regression guard for that crash. Route behaviour and real
+// synthesis are covered separately by dev/test-host-tts.mjs; here the only
+// question is whether the module is a well-formed, config-safe Cordis plugin.
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = resolve(dirname(fileURLToPath(import.meta.url)));
 const ROOT = resolve(HERE, '..');
@@ -20,6 +20,12 @@ const HOST = resolve(ROOT, 'lib/index.js');
 if (!existsSync(HOST)) {
   console.error('lib/index.js not found');
   process.exit(2);
+}
+
+const problems = [];
+function note(ok, label, detail = '') {
+  console.log(`  ${ok ? 'OK  ' : 'FAIL'} ${label}${detail ? '  (' + detail + ')' : ''}`);
+  if (!ok) problems.push(label);
 }
 
 /** The exact logic from @deepseek-ai/cordis resolveConfig. */
@@ -31,45 +37,95 @@ function resolveConfig(runtime, config) {
   return result.value;
 }
 
-console.log('=== old shape (plain JSON Schema) — expected to fail ===');
-try {
-  resolveConfig({ Config: { type: 'object', properties: {} } }, {});
-  console.log('  unexpectedly passed');
-  process.exitCode = 1;
-} catch (error) {
-  console.log('  fails as expected:', error.message);
+console.log('=== the crash this guards against (plain JSON Schema) ===');
+{
+  let threw = false;
+  try {
+    resolveConfig({ Config: { type: 'object', properties: {} } }, {});
+  } catch (error) {
+    threw = true;
+    console.log('  reproduces:', error.message);
+  }
+  note(threw, 'a plain JSON-Schema Config still crashes resolveConfig');
 }
 
 console.log('\n=== current lib/index.js ===');
 const mod = await import(pathToFileURL(HOST).href);
-console.log('  exports        :', Object.keys(mod).join(', '));
-console.log('  name           :', mod.name);
-console.log('  typeof apply   :', typeof mod.apply);
-console.log('  has Config     :', 'Config' in mod);
+note(typeof mod.name === 'string', 'exports a string name', mod.name);
+note(typeof mod.apply === 'function', 'exports apply()');
+note(!('Config' in mod), 'declares no Config (the crash source)');
 
 try {
-  const resolved = resolveConfig(mod, { anything: true });
-  console.log('  resolveConfig  : OK (returns config unchanged)');
+  resolveConfig(mod, { anything: true });
+  note(true, 'resolveConfig() accepts the module');
 } catch (error) {
-  console.log('  resolveConfig  : FAILED —', error.message);
-  process.exitCode = 1;
+  note(false, 'resolveConfig() accepts the module', error.message);
 }
 
-// apply() must not throw when given a minimal ctx
-const calls = [];
-const ctx = { logger: { debug: (m) => calls.push(m), info: (m) => calls.push(m) } };
-try {
-  mod.apply(ctx, {});
-  console.log('  apply(ctx)     : OK');
-} catch (error) {
-  console.log('  apply(ctx)     : FAILED —', error.message);
-  process.exitCode = 1;
-}
-
-// The file must not reference schemastery (it is dependency-free on purpose)
+// The module must stay free of a schemastery dependency.
 const source = readFileSync(HOST, 'utf8');
-const importsSchemastery = /from\s+['"]@deepseek-ai\/schemastery['"]/.test(source);
-console.log('  imports schemastery:', importsSchemastery, importsSchemastery ? '(unexpected)' : '(good, dependency-free)');
-if (importsSchemastery) process.exitCode = 1;
+note(
+  !/from\s+['"]@deepseek-ai\/schemastery['"]/.test(source),
+  'no schemastery import (stays dependency-free)',
+);
 
-console.log('\n' + (process.exitCode ? 'FAILED' : 'host half satisfies the Cordis config contract'));
+console.log('\n=== apply() against a realistic host context ===');
+{
+  const registered = [];
+  let injected = null;
+  const ctx = {
+    // The real host context provides this; the module calls it to wait for
+    // `webServer`, and a stub that omitted it would fail for the wrong reason.
+    inject(names, fn) { injected = names; fn(ctx); },
+    effect(fn) { return fn; },
+    on() {},
+    logger: { warn() {}, info() {}, debug() {} },
+    webServer: {
+      register({ kind, path, handler }) {
+        registered.push({ kind, path, handler });
+        return () => {};
+      },
+    },
+  };
+  try {
+    mod.apply(ctx, {});
+    note(true, 'apply(ctx) runs without throwing');
+  } catch (error) {
+    note(false, 'apply(ctx) runs without throwing', error.message);
+  }
+  note(Array.isArray(injected) && injected.includes('webServer'), 'injects webServer', JSON.stringify(injected));
+  note(registered.length === 2, 'registers exactly two routes', 'count=' + registered.length);
+  note(registered.every((r) => r.kind === 'exact'), 'both routes are exact matches');
+  note(registered.every((r) => typeof r.handler === 'function'), 'both routes have handlers');
+}
+
+console.log('\n=== the vendored synthesis module loads ===');
+{
+  const vendored = resolve(ROOT, 'lib/edge-tts.js');
+  note(existsSync(vendored), 'lib/edge-tts.js exists');
+  if (existsSync(vendored)) {
+    const text = readFileSync(vendored, 'utf8');
+    note(/\bMIT\b/.test(text), 'carries an MIT notice');
+    note(/dsh-tts-reader/.test(text), 'names its upstream source');
+    try {
+      const m = await import(pathToFileURL(vendored).href);
+      note(typeof m.synthesizeMp3 === 'function', 'exports synthesizeMp3()');
+      note(typeof m.synthesizeMp3WithRetry === 'function', 'exports synthesizeMp3WithRetry()');
+      note(typeof m.listVoices === 'function', 'exports listVoices()');
+    } catch (error) {
+      note(false, 'vendored module imports cleanly', error.message);
+    }
+  }
+}
+
+// A missing attribution file would be a licence problem, not a code problem.
+console.log('\n=== attribution present ===');
+{
+  const notices = resolve(ROOT, 'THIRD-PARTY-NOTICES.md');
+  note(existsSync(notices), 'THIRD-PARTY-NOTICES.md exists');
+}
+
+console.log('\n' + (problems.length
+  ? `FAILED (${problems.length}): ${problems.join('; ')}`
+  : 'host half satisfies the Cordis config contract'));
+process.exitCode = problems.length ? 1 : 0;
