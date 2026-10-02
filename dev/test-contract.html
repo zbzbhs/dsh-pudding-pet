@@ -186,6 +186,24 @@
     synth.cancel = function () {};
   }
 
+  // Payloads shaped exactly like DSH's own types:
+  //   assistant/message -> { turn, step, message, stream: AssistantStreamRecord[] }
+  // The visible answer lives in `text-chunks` records, NOT in a `{text}` field.
+  function assistantEvent(text) {
+    return {
+      turn: 1,
+      step: 1,
+      stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [10], texts: [text] }],
+      message: { id: 'm' + text.length, role: 'assistant', content: [{ type: 'text', text: text }] }
+    };
+  }
+  function userEvent(text) {
+    return {
+      turn: 1, step: 1,
+      message: { id: 'u' + text.length, role: 'user', content: [{ type: 'text', text: text }] }
+    };
+  }
+
   var SENTENCE = '你好，这是一条回复。第二句在这里！';
   var TABLE_REPLY = '## 标题\n\n有 `代码` 和 **加粗**。\n\n```js\nvar a=1;\n```\n\n| A | B |\n|---|---|\n| 1 | 2 |';
 
@@ -216,7 +234,7 @@
     check('chrome stylesheet injected', !!document.getElementById('dsh-pudding-pet-chrome'));
 
     // --- assistant reply reaches speech ---------------------------------
-    H.pushEvent('assistant/message', { stream: SENTENCE });
+    H.pushEvent('assistant/message', assistantEvent(SENTENCE));
 
     setTimeout(function () {
       check('assistant reply reached speech', spoke.length > 0, JSON.stringify(spoke).slice(0, 160));
@@ -226,14 +244,14 @@
       check('reply text preserved', spoke[0] === SENTENCE, String(spoke[0]));
 
       var beforeUser = spoke.length;
-      H.pushEvent('user/message', { stream: '这是我说的话。' });
+      H.pushEvent('user/message', userEvent('这是我说的话。'));
 
       setTimeout(function () {
         check('user text silent by default (readInput=false)',
           spoke.length === beforeUser, 'before=' + beforeUser + ' after=' + spoke.length);
 
         var mark = spoke.length;
-        H.pushEvent('assistant/message', { stream: TABLE_REPLY });
+        H.pushEvent('assistant/message', assistantEvent(TABLE_REPLY));
 
         // The queue speaks one sentence at a time; wait for it to drain.
         setTimeout(function () {

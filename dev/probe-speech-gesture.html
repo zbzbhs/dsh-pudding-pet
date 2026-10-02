@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>语音解锁测试</title></head>
+<body><pre id="out">running…</pre>
+<script>
+// Does speechSynthesis need a user gesture in this Chromium?
+//
+// If it does, a pet that speaks without any prior click would be silently
+// ignored — which looks exactly like "the pet renders but never talks".
+// This also checks whether the voice list is populated before the first
+// getVoices() call, since an empty list makes `speak()` a no-op.
+(function () {
+  var log = [];
+  function L() { log.push(Array.prototype.slice.call(arguments).join(' ')); }
+  function flush() { document.getElementById('out').textContent = log.join('\n'); }
+
+  var synth = window.speechSynthesis;
+  L('speechSynthesis present :', !!synth);
+  if (!synth) { flush(); return; }
+
+  L('autoplay/user-activation :', navigator.userActivation
+    ? ('active=' + navigator.userActivation.isActive + ' hasBeenActive=' + navigator.userActivation.hasBeenActive)
+    : '(no userActivation API)');
+
+  var immediate = synth.getVoices() || [];
+  L('voices at t=0           :', immediate.length);
+
+  var events = [];
+  function attach(u, label) {
+    u.onstart = function () { events.push(label + ':start'); L(label, 'onstart'); };
+    u.onend = function () { events.push(label + ':end'); L(label, 'onend'); flush(); };
+    u.onerror = function (e) { events.push(label + ':error'); L(label, 'onerror', e && e.error); flush(); };
+  }
+
+  setTimeout(function () {
+    var later = synth.getVoices() || [];
+    L('voices at t=800ms       :', later.length);
+    if (later.length) {
+      L('  first voice           :', later[0].name, later[0].lang, 'local=' + later[0].localService);
+    }
+
+    // Attempt to speak WITHOUT any user gesture.
+    var u = new SpeechSynthesisUtterance('测试一');
+    u.lang = 'zh-CN';
+    if (later.length) u.voice = later.find(function (v) { return /^zh/i.test(v.lang || ''); }) || later[0];
+    attach(u, 'no-gesture');
+    L('speaking without gesture…');
+    try { synth.speak(u); } catch (e) { L('speak threw:', e.message); }
+
+    // Also check the paused state, which some builds report after a blocked speak.
+    setTimeout(function () {
+      L('synth.pending           :', synth.pending);
+      L('synth.speaking          :', synth.speaking);
+      L('synth.paused            :', synth.paused);
+      L('events so far           :', JSON.stringify(events));
+      L('');
+      L('interpretation: if onstart never fired and speaking=false, the utterance');
+      L('was dropped (gesture gating) or the voice list was unusable.');
+      flush();
+    }, 1500);
+  }, 800);
+})();
+</script>
+</body></html>

@@ -1,9 +1,0 @@
-构建确定性输出 LF，新增安装校验脚本
-
-- tools/build.mjs：构建产物统一归一化为 LF。
-  .gitattributes 以 LF 存储，而 Windows 检出是 CRLF；
-  未归一化时 --check 会误报“产物过期”，且跨平台不可复现。
-
-- tools/verify-installed.mjs：校验 profile 内已安装的副本。
-  从 GitHub 安装的是静态副本，修了仓库不等于修了已装的那份。
-  校验内容哈希（忽略行尾）、Cordis 配置契约、清单字段与 client 导出。

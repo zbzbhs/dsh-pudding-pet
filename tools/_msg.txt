@@ -1,0 +1,53 @@
+修复朗读失效：文本提取全落空 + 无音频解锁
+
+宠物能显示但一个字都读不出来，有两个独立原因。
+
+一、文本提取三个分支全部落空（决定性）
+
+`assistant/message` 的 `data.stream` 是数组（AssistantStreamRecord[]），
+不是 `{text}` 对象：
+
+    'assistant/message': { turn; step; message: AssistantMessage;
+                           stream: AssistantStreamRecord[]; usage?; interrupted? }
+
+而原代码按对象读，三个分支全部落空，body 恒为空后静默 return：
+
+    if (typeof stream === 'string') body = stream;                          // false
+    else if (stream && typeof stream.text === 'string') body = stream.text;  // 数组无 .text
+    else if (data.message && typeof data.message.text === 'string') ...      // 无 .text
+    if (!body) return;   // ← 每次都从这里静默返回
+
+修复：按官方类型读取，与 dsh-tts-reader 的 textsFromStream/textFromMessage 同构。
+  - `r.type === 'text-chunks'` → `r.texts.join('')`
+  - `r.type === 'chunk'` 且 `r.chunk.type === 'text-delta'` → `r.chunk.text`
+  - 回退：`data.message.content[]` 里 `b.type === 'text'` → `b.text`
+推理与工具调用永不朗读。
+
+同时修正 `assistant/chunk` 分支：判别值应为 `'text-delta'` 而非 `'text'`，
+且该事件名只存在于旧格式回放；客户端实时增量是 `assistant/live-chunk`。
+
+二、语音被自动播放策略拦截
+
+实测（Chromium 151）：
+
+    no-gesture onerror not-allowed
+
+页面未收到用户手势前，speechSynthesis 会被静默拒绝。另实测语音列表在
+t=0 时为空、约 800ms 后才可用。
+
+修复：监听首次 pointerdown/keydown 做一次静音解锁；被拦截时通过气泡
+提示「先点一下页面」，不再静默失败。
+
+三、两个可靠性修复
+
+- `attach()` 原本只尝试一次，服务或会话未就绪就永久放弃。改为失败后重试，
+  并订阅会话目录变化，使晚打开的会话也能被接上。
+- `seen` 水位线原本在事件处理前推进，处理失败会让该消息永久丢失。
+  改为处理成功后再推进，并兼容 `transient` 条目。
+
+测试
+- 新增 dev/test-speech-bridge.mjs：10 项断言，用 DSH 真实数据结构驱动
+  真实 bundle，覆盖 text-chunks 提取、content 回退、推理/工具不朗读、
+  晚挂载重试、user 默认静音。
+- dev/test-contract.html 的 fixture 更新为真实结构，35 项断言全绿。
+- 新增 dev/probe-speech-gesture.html：复现 not-allowed 拦截。
