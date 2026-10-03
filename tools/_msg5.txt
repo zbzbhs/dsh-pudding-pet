@@ -1,0 +1,21 @@
+修复分段器：SSML 超预算 + emoji 被切坏
+
+新增的加固断言暴露了两个真实缺陷，都在长文本分段路径上。
+
+1. [DATA LOSS] 代理对被从中间切开
+   vendored 的 splitForRequests() 按 UTF-16 长度二分找切点再 slice，
+   切点可能落在代理对中间；孤立代理编码为 U+FFFD，
+   用户听到的文本被静默损坏（实测 30 个 emoji 出现 2 个 U+FFFD）。
+   修复：切点回退到不劈开代理对的位置。
+
+2. [RELIABILITY] SSML 超出服务端 1800 字节预算
+   splitForRequests(text, 1800) 的预算只算纯文本，
+   而 <speak> + <voice name='…'> + <prosody …> 包装另加约 235 字节，
+   实际请求达到 2035 字节，会被服务端拒绝。
+   修复：按「预算 - 包装开销」分配文本额度，并计入 XML 转义后的长度
+   （转义会膨胀，& 变 &amp;）。实测最大 1615 字节。
+
+实现方式：在 lib/index.js 内实现 splitForSpeech()，不改动 vendored 文件正文
+（保持其与上游逐字节可比，这正是 provenance 头记录 SHA-256 的意义）。
+
+验证：dev/test-host-hardening.mjs 99/99 通过。

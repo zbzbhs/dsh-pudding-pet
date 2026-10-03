@@ -53,27 +53,31 @@ if (remoteSha === localSha) {
 // the API creates commits server-side, so their SHAs differ from the local ones
 // and `git rev-list <remote>..<local>` cannot resolve the range.
 //
-// The boundary is therefore found by matching the remote tip's *subject line*
-// against the local history. The full message is not compared: the API
-// round-trip can normalize trailing whitespace, which made an exact match fail.
+// The boundary is found by matching the remote tip's TREE, not its message.
+// Trees are content-addressed, so a match is exact; message matching is not
+// reliable because routine commits legitimately repeat a subject ("remove the
+// temporary message file"), and matching the newest such commit would report
+// "nothing to push" while real work sat unpublished.
 const remoteCommit = api(`repos/${REPO}/git/commits/${remoteSha}`);
-const remoteSubject = String(remoteCommit.message || '').split('\n')[0].trim();
+const remoteTree = remoteCommit.tree.sha;
 
-const localCommits = git(['log', '--pretty=%H%x00%s', `refs/heads/${BRANCH}`])
+const localCommits = git(['log', '--pretty=%H%x00%T%x00%s', `refs/heads/${BRANCH}`])
   .split('\n')
   .filter(Boolean)
   .map((line) => {
-    const [sha, subject] = line.split('\u0000');
-    return { sha, subject: String(subject || '').trim() };
+    const [sha, tree, subject] = line.split('\u0000');
+    return { sha, tree, subject: String(subject || '').trim() };
   });
 
-const boundary = localCommits.findIndex((c) => c.subject === remoteSubject);
+// Newest match wins: several commits can share a tree (a commit that only
+// removes an untracked file leaves the tree unchanged).
+const boundary = localCommits.findIndex((c) => c.tree === remoteTree);
 if (boundary < 0) {
-  console.error('\nREFUSING: the remote tip does not correspond to any local commit.');
+  console.error('\nREFUSING: the remote tip\'s tree matches no local commit.');
   console.error('Publish or fetch it first, then re-run.');
-  console.error('remote subject:', JSON.stringify(remoteSubject));
-  console.error('local subjects (newest first):');
-  for (const c of localCommits.slice(0, 5)) console.error('  ', JSON.stringify(c.subject));
+  console.error('remote tree:', remoteTree);
+  console.error('local trees (newest first):');
+  for (const c of localCommits.slice(0, 5)) console.error('  ', c.tree, c.subject);
   process.exit(1);
 }
 

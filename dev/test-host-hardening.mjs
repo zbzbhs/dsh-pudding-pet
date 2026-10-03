@@ -34,13 +34,27 @@ function check(name, pass, detail = '') {
   console.log(`  ${pass ? 'OK  ' : 'FAIL'} ${name}${detail ? '  (' + detail + ')' : ''}`);
 }
 
-// Any of these during the run is a reliability defect in its own right.
+// Any of these during the run is a reliability defect in its own right, but a
+// fault raised by THIS harness must not be reported as a product fault: record
+// it, print it, and let the run end rather than continuing half-blind. Without
+// the print a harness bug just looks like a hang, which is how this file once
+// wasted a debug cycle.
 const processFaults = [];
+function recordFault(kind, detail) {
+  const line = kind + ': ' + detail;
+  processFaults.push(line);
+  console.log('  FAIL harness fault  (' + line + ')');
+}
 process.on('unhandledRejection', (reason) => {
-  processFaults.push('unhandledRejection: ' + String((reason && reason.message) || reason));
+  recordFault('unhandledRejection', String((reason && reason.stack) || reason));
 });
 process.on('uncaughtException', (error) => {
-  processFaults.push('uncaughtException: ' + String((error && error.message) || error));
+  recordFault('uncaughtException', String((error && error.stack) || error));
+  // An exception here is almost always this harness, not the route under test
+  // (the route converts its own failures into 4xx/5xx). Stop instead of
+  // waiting forever on a promise nobody will settle.
+  process.exitCode = 1;
+  queueMicrotask(() => process.exit(1));
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -365,8 +379,8 @@ const json = (r) => { try { return JSON.parse(r.body.toString('utf8')); } catch 
 async function synth(query, opts) {
   const before = fake.ssml.length;
   const r = await call('/pudding-pet/tts', { query, ...opts });
-  const captured = fake.ssml.slice(before);
-  return { r, ssml: captured.length ? captured[captured.length - 1] : null, attempts: captured.length };
+  const frames = fake.ssml.slice(before);
+  return { r, ssml: frames.length ? frames[frames.length - 1] : null, frames, attempts: frames.length };
 }
 
 // ================================================================== fence
