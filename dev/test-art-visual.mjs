@@ -248,6 +248,91 @@ console.log('\n=== a failed image load does not show a broken icon ===');
   check('the image is hidden instead of broken', img.style.visibility === 'hidden', img.style.visibility);
 }
 
+// ---------------------------------------------------------------- swapping
+// Swapping the character in place is what lets a local character appear after
+// mount. The built-in character's own `destroy()` detaches listeners but leaves
+// its <svg> in the DOM, so a naive swap left BOTH characters on screen — the
+// "two cats" defect. These assertions pin the cleanup that prevents it.
+console.log('\n=== swapping a character does not leave two on screen ===');
+{
+  const start = bundle.indexOf('PetWidget.prototype.setVisual = function');
+  if (start < 0) throw new Error('setVisual not found in the bundle');
+  const end = bundle.indexOf('\n    };', start);
+  // Only the prototype method is taken, so a stub constructor supplies the
+  // `PetWidget` the assignment targets.
+  const PetWidget = new Function(
+    `var PetWidget = function () {}; ${bundle.slice(start, end + 7)}; return PetWidget;`,
+  )();
+
+  /** A widget with only the fields setVisual touches. */
+  function makeWidget() {
+    const dom = makeDom();
+    globalThis.document = dom.document;
+    const cat = dom.document.createElement('div');
+    const bubble = dom.document.createElement('div');
+    cat.appendChild(bubble);
+    const widget = Object.create(PetWidget.prototype);
+    widget.cat = cat;
+    widget.bubble = bubble;
+    widget.root = dom.document.createElement('div');
+    widget.preferences = { size: 200, motion: true };
+    widget.state = 'idle';
+    widget.disposed = false;
+    widget.visualAdapter = null;
+    widget.instance = null;
+    return { widget, cat, bubble, dom };
+  }
+
+  /** Add a character element to the container, as an adapter would. */
+  function addCharacter(cat) {
+    const el = globalThis.document.createElement('img');
+    cat.appendChild(el);
+    return el;
+  }
+
+  const adapter = { mount(host) { addCharacter(host); return { setState() {}, poke() {}, setScale() {}, destroy() {} }; } };
+
+  {
+    const { widget, cat, bubble } = makeWidget();
+    widget.instance = { setState() {}, poke() {}, setScale() {}, destroy() { /* cleans up */ } };
+    addCharacter(cat);
+    widget.setVisual(adapter);
+    const characters = cat.children.filter((c) => c !== bubble);
+    check('exactly one character remains after a swap', characters.length === 1, 'characters=' + characters.length);
+    check('the bubble was not swept away', cat.children.indexOf(bubble) !== -1);
+    check('the new adapter is recorded', widget.visualAdapter === adapter);
+  }
+
+  {
+    // The defect as it happened: an adapter whose destroy() forgets its element.
+    const { widget, cat, bubble } = makeWidget();
+    widget.instance = { setState() {}, poke() {}, setScale() {}, destroy() { /* forgets */ } };
+    addCharacter(cat);
+    widget.setVisual(adapter);
+    const characters = cat.children.filter((c) => c !== bubble);
+    check('a forgetful destroy() still leaves only one character',
+      characters.length === 1, 'characters=' + characters.length);
+  }
+
+  {
+    // Re-selecting the same adapter must be a no-op, or every preference change
+    // would rebuild the artwork.
+    let mounts = 0;
+    const counting = { mount(host) { mounts += 1; addCharacter(host); return { setState() {}, poke() {}, setScale() {}, destroy() {} }; } };
+    const { widget } = makeWidget();
+    widget.setVisual(counting);
+    widget.setVisual(counting);
+    check('re-selecting the same adapter does not remount', mounts === 1, 'mounts=' + mounts);
+  }
+
+  {
+    const { widget } = makeWidget();
+    let threw = false;
+    try { widget.setVisual(null); widget.setVisual({}); widget.setVisual({ mount: 'nope' }); } catch (error) { threw = true; }
+    check('an unusable adapter is ignored, not thrown on', !threw);
+  }
+}
+
 const failed = results.filter((r) => !r.pass);
 console.log('\n' + (failed.length
   ? `FAILED (${failed.length}/${results.length}): ${failed.map((f) => f.name).join('; ')}`

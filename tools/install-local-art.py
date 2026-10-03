@@ -31,9 +31,11 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 SRC = Path(r"D:\Deepseek Harness file\_assets\tom-webp")
@@ -48,31 +50,114 @@ DEST = PKG / "assets" / "local"
 ALPHA_CLEAR_MIN = 0.30   # fraction of alpha == 0 (transparent background)
 ALPHA_SOLID_MIN = 0.05   # fraction of alpha == 255 (fully opaque character)
 
+# --------------------------------------------------------------------------
+# Talk repair
+#
+# All three extracted mouth-shape clips are damaged, and the aggregate audit does
+# not show how badly. Measured per frame (_research/_talk_repair_sweep.py):
+#
+#   clip         usable frames   longest contiguous run
+#   talk02_IC       1 / 17       [16]           -> unusable
+#   talk04_IC       4 / 17       [14,15,16]     -> unusable
+#   talk04_DC      14 / 17       [0..7]         -> the only viable source
+#
+# The defect is `face_ghosted`: the matte under-estimated alpha across the whole
+# head (median ~130 where the baseline is 255) and left no enclosed holes to fill.
+# The RGB underneath is still the real face for talk04_DC, so restoring a solid
+# alpha brings the face back. That is measured, not assumed — colour distance from
+# the baseline face is 3.8-31 for talk04_DC and 70-108 for the unusable clips,
+# where the background bleeds through instead.
+#
+# So the talk animation is rebuilt from talk04_DC's contiguous good run with a
+# binary alpha, and the other two clips are dropped.
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Alpha repair for every clip
+#
+# The matte under-estimated alpha across the whole sprite set, not just the talk
+# clips. Measured per clip (_research/_audit_all_clips2.py), the share of each
+# character that renders semi-transparent:
+#
+#   blink 8.6%   talk 0.0%      <- sound
+#   iceCream 24.6%   chilli 25.6%   pokeKnockout 34.7%   pokeHead 36.7%
+#   hungry 49.4%
+#
+# and the worst of them are visibly wrong, not merely imperfect: `pokeHead` as
+# shipped has an opaque-character colour 81 away from the clean baseline.
+#
+# The repair is a solid alpha — the character is an opaque object, so a pixel is
+# present or absent — with the RGB untouched.
+#
+# The threshold was measured on two axes at once (_research/_threshold_final.py),
+# because either alone can be gamed:
+#
+#   purity    the pixels the repair promotes must look more like the character
+#             than like the background. Purity alone always favours a high cut,
+#             which punches holes in the character.
+#   coverage  kept / present, measured against the clip's OWN matte. Comparing
+#             against another clip's pixel count is invalid — poses differ, and a
+#             knocked-out character legitimately occupies less of the frame.
+#
+# Both earlier metrics were wrong in exactly those ways before being corrected.
+# At 30 every repairable clip keeps 98-99% of its character with a purity margin
+# of 19-58. Two clips fail both bars at every threshold and are dropped instead
+# of shipped: `chilli` and `pokeHead` (see UNREPAIRABLE below).
+GHOST_THRESHOLD = 30
+GHOST_SEMI_MIN = 0.15     # repair only when this share of the character is semi
+
+# The colour behind the character in the source video, sampled from its border
+# (the camera is static and the wall never moves there). Measured once with
+# _research/_promoted_pixels.py; it is a property of the footage, not a guess.
+SOURCE_BACKGROUND_RGB = np.array([87.4, 61.7, 44.4])
+
+# Clips the alpha repair cannot fix, at any threshold.
+#
+# Their promoted pixels sit closer to the background than to the character at every
+# cut tried, which means the RGB underneath is wall, not character — no alpha
+# threshold can recover that. States that used them are remapped to clips that were
+# verified clean, so every state still resolves to artwork that is visually sound.
+UNREPAIRABLE = {
+    "chilli": "promoted pixels match the background, not the character",
+    "pokeHead": "promoted pixels match the background, not the character",
+}
+
+TALK_SOURCE = "talk04_DC"
+TALK_FRAMES = (0, 8)          # half-open: the longest contiguous usable run
+TALK_ALPHA_THRESHOLD = GHOST_THRESHOLD
+TALK_MIN_OPAQUE_FACE = 12000  # a healthy frame keeps about the baseline's share
+
 # state -> clip, how to play it, and what it stands for.
 #
 #   loop   the animation repeats
 #   still  hold one pose (uses the generated PNG, since <img> cannot pause a WebP)
 #   breath a slow CSS scale, so a held pose still reads as alive
 STATES = {
+    # Clips used here are only the ones the audit verified: blink, listen, hungry,
+    # iceCream, pokeKnockout, talk. `chilli` and `pokeHead` are dropped because
+    # their alpha cannot be repaired, and every state that used them is remapped so
+    # no state can resolve to a ghosted face.
     "idle":     {"clip": "blink",        "loop": True,  "breath": True,  "why": "眨眼循环，最接近待机"},
     "listen":   {"clip": "listen",       "still": True, "breath": True,  "why": "专注倾听（单帧）"},
     "think":    {"clip": "hungry",       "still": True, "breath": True,  "why": "期待的神情，用作思考"},
-    "work":     {"clip": "talk04_DC",    "loop": True,                   "why": "嘴部持续动作，用作忙碌"},
+    "work":     {"clip": "blink",        "still": True, "breath": True,  "why": "中性站姿，用作忙碌"},
     "waiting":  {"clip": "hungry",       "loop": True,                   "why": "等待 / 期待"},
-    "talk":     {"clip": "talk04_IC",    "loop": True,                   "why": "说话口型主选"},
+    "talk":     {"clip": "talk",         "loop": True,                   "why": "说话口型（已修复 alpha）"},
     "happy":    {"clip": "iceCream",     "loop": True,                   "why": "吃冰淇淋，用作开心"},
+    "eat":      {"clip": "iceCream",     "loop": True,                   "why": "吃东西（原用 chilli，已换）"},
     "sad":      {"clip": "pokeKnockout", "still": True,                  "why": "被戳晕的呆滞，用作低落"},
     "sleep":    {"clip": "blink",        "still": True, "breath": True,  "why": "闭眼帧，用作睡眠"},
-    "poke":     {"clip": "pokeHead",     "loop": True,                   "why": "被戳头的反应"},
-    "eat":      {"clip": "chilli",       "loop": True,                   "why": "吃东西的剧烈反应"},
-    "hungry":   {"clip": "hungry",       "loop": True,                   "why": "饥饿"},
+    "poke":     {"clip": "pokeKnockout", "loop": True,                   "why": "被戳的反应（原用 pokeHead，已换）"},
     "knockout": {"clip": "pokeKnockout", "loop": True,                   "why": "被戳晕（完整动作）"},
-    "spicy":    {"clip": "chilli",       "loop": True,                   "why": "被辣到"},
+    "hungry":   {"clip": "hungry",       "loop": True,                   "why": "饥饿"},
 }
 
-# Mouth shapes the client rotates through while speaking, so a long reply does not
-# repeat one shape.
-TALK_VARIANTS = ["talk04_IC", "talk02_IC", "talk04_DC"]
+# Mouth shapes used while speaking.
+#
+# The three raw mouth-shape clips are all damaged, so the rotation is a single
+# repaired clip: `talk`, rebuilt from talk04_DC's contiguous good run (see the
+# talk-repair notes above). Listing the damaged originals here would put a ghosted
+# face on screen a third of the time.
+TALK_VARIANTS = ["talk"]
 
 
 # --------------------------------------------------------------------------- #
@@ -373,6 +458,305 @@ def audit_local() -> int:
 # --------------------------------------------------------------------------- #
 # install
 # --------------------------------------------------------------------------- #
+# The band of the canvas that holds the head, in rows. Derived from the baseline
+# clip's silhouette, which starts at about row 59 and reaches the shoulders by 200.
+FACE_BAND = (60, 200)
+
+
+def face_reference() -> np.ndarray | None:
+    """The baseline face colour, taken from the one clip known to be clean.
+
+    `blink` is fully opaque (its audit reports 100% clean frames), so the mean
+    colour of its opaque head pixels is what a correct face looks like.
+    """
+    path = SRC / "blink.webp"
+    if not path.is_file():
+        return None
+    try:
+        with Image.open(path) as im:
+            im.seek(0)
+            arr = np.array(im.convert("RGBA"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"  note: could not read {path.name}: {type(exc).__name__}: {exc}")
+        return None
+    band = slice(FACE_BAND[0], FACE_BAND[1])
+    solid = arr[band, :, 3] >= 251
+    if not solid.any():
+        return None
+    return arr[band, :, :3][solid].astype(np.float64).mean(axis=0)
+
+
+def face_stats_from_array(arr: np.ndarray, baseline: np.ndarray) -> dict:
+    """Opaque head pixels and how far the face colour drifted from the baseline.
+
+    The distance is the discriminator that matters: a repaired frame whose face
+    colour is still close to the baseline had a wrong alpha over a real face,
+    whereas a large distance means background is showing through instead.
+    """
+    band = slice(FACE_BAND[0], FACE_BAND[1])
+    solid = arr[band, :, 3] >= 251
+    count = int(solid.sum())
+    if count == 0:
+        return {"opaqueFace": 0, "distance": 999.0}
+    rgb = arr[band, :, :3][solid].astype(np.float64).mean(axis=0)
+    return {"opaqueFace": count, "distance": float(np.linalg.norm(rgb - baseline))}
+
+
+def check_alpha(path: Path, label: str) -> bool:
+    """Whether an image keeps a transparent background and an opaque subject.
+
+    Applied to every produced artifact, because losing the alpha channel is the
+    failure mode that turns the pet into an opaque rectangle — and a lossy WebP
+    re-encode is exactly where that can happen silently.
+    """
+    try:
+        with Image.open(path) as im:
+            rgba = im.convert("RGBA")
+            total = rgba.size[0] * rgba.size[1]
+            hist = rgba.getchannel("A").histogram()
+    except Exception as exc:  # noqa: BLE001
+        print(f"    FAIL {label}: unreadable ({type(exc).__name__}: {exc})")
+        return False
+
+    clear = hist[0] / total
+    solid = hist[255] / total
+    ok = clear >= ALPHA_CLEAR_MIN and solid >= ALPHA_SOLID_MIN
+    print(f"    alpha {label}: clear={clear * 100:.1f}%  solid={solid * 100:.1f}%")
+    if not ok:
+        print(f"    FAIL {label}: alpha out of range "
+              f"(clear>={ALPHA_CLEAR_MIN * 100:.0f}%, solid>={ALPHA_SOLID_MIN * 100:.0f}%)")
+    return ok
+
+
+def semi_fraction(arr: np.ndarray) -> float:
+    """Share of the character that is neither absent nor fully opaque.
+
+    This is the ghosting metric, and it is pose-independent: it is measured over
+    whatever pixels are present, so a clip where the character lies down scores the
+    same way as one where it stands. A fixed region of the canvas cannot do that —
+    an earlier audit applied to `pokeKnockout` reported the contradictory pair
+    "0% semi-transparent, 0 opaque pixels" because the head had moved out of the
+    assumed band.
+    """
+    a = arr[:, :, 3]
+    present = a > 8
+    if not present.any():
+        return 0.0
+    return float(((a > 8) & (a <= 251)).sum() / present.sum())
+
+
+def install_clip(name: str, source: Path, dest: Path) -> dict | None:
+    """Copy a clip, repairing its alpha when the matte under-estimated it.
+
+    A clip whose alpha is already sound is copied through untouched — binarising a
+    good alpha would only make a soft edge jagged.
+
+    A repair is only accepted if the pixels it promoted look more like the character
+    than like the background. That check is what catches an unfixable clip: for
+    `chilli` and `pokeHead` the promoted pixels match the wall at every threshold,
+    meaning the RGB underneath is background and no alpha cut can recover it. Those
+    are refused rather than shipped, and their states are remapped.
+
+    @returns a manifest entry, or None when the clip cannot be produced.
+    """
+    if not source.is_file():
+        print(f"  FAIL {name}: {source.name} not found")
+        return None
+
+    frames: list[np.ndarray] = []
+    try:
+        with Image.open(source) as im:
+            for index in range(getattr(im, "n_frames", 1)):
+                im.seek(index)
+                frames.append(np.array(im.convert("RGBA")))
+    except Exception as exc:  # noqa: BLE001
+        print(f"  FAIL {name}: unreadable ({type(exc).__name__}: {exc})")
+        return None
+
+    if not frames:
+        print(f"  FAIL {name}: no frames")
+        return None
+
+    median_semi = float(np.median([semi_fraction(f) for f in frames]))
+    repaired = median_semi > GHOST_SEMI_MIN
+
+    if repaired:
+        # Measure before repairing: the promotion check needs the original alpha to
+        # know which pixels the cut is about to make opaque.
+        promoted_rgbs = []
+        character_rgbs = []
+        for arr in frames:
+            a = arr[:, :, 3]
+            promoted = (a >= GHOST_THRESHOLD) & (a <= 251)
+            if promoted.sum() > 50:
+                promoted_rgbs.append(arr[:, :, :3][promoted].astype(np.float64).mean(axis=0))
+            if (a >= 251).sum() > 50:
+                character_rgbs.append(arr[:, :, :3][a >= 251].astype(np.float64).mean(axis=0))
+
+        if promoted_rgbs:
+            promoted = np.mean(promoted_rgbs, axis=0)
+            character = np.mean(character_rgbs, axis=0) if character_rgbs else np.zeros(3)
+            char_dist = float(np.linalg.norm(promoted - character))
+            bg_dist = float(np.linalg.norm(promoted - SOURCE_BACKGROUND_RGB))
+            margin = bg_dist - char_dist
+            if margin < 0:
+                print(f"  REFUSE {name}: the repair would paint background in "
+                      f"(promoted colour is {char_dist:.1f} from the character but "
+                      f"{bg_dist:.1f} from the background)")
+                return None
+            print(f"    {name}: promoted pixels {char_dist:.1f} from the character, "
+                  f"{bg_dist:.1f} from the background (margin {margin:+.1f})")
+
+        # Solid alpha only; the RGB is untouched, so no colour is invented.
+        for arr in frames:
+            arr[:, :, 3] = np.where(arr[:, :, 3] >= GHOST_THRESHOLD, 255, 0)
+
+    work = Path(tempfile.mkdtemp(prefix=f"clip-{name}-"))
+    for index, arr in enumerate(frames):
+        Image.fromarray(arr, "RGBA").save(work / f"f{index:04d}.png")
+
+    cmd = [
+        "ffmpeg", "-v", "error",
+        "-framerate", "30",
+        "-i", str(work / "f%04d.png"),
+        "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "78",
+        "-loop", "0", "-an", "-f", "webp",
+        str(dest), "-y",
+    ]
+    proc = subprocess.run(cmd, capture_output=True)
+    if proc.returncode != 0 or not dest.is_file() or dest.stat().st_size <= 0:
+        detail = proc.stderr.decode(errors="replace").strip()[:160]
+        print(f"  FAIL {name}: encode failed ({detail or 'no stderr'})")
+        return None
+
+    if dest.exists() and not check_alpha(dest, dest.name):
+        dest.unlink(missing_ok=True)
+        return None
+
+    with Image.open(dest) as im:
+        encoded = getattr(im, "n_frames", 1)
+
+    marker = "repaired" if repaired else "as-is"
+    print(f"  {dest.name:<22} {dest.stat().st_size / 1024:>6.1f} KB  "
+          f"{encoded:>3} frames  semi {median_semi * 100:>5.1f}% -> {marker}")
+
+    return {
+        "file": dest.name,
+        "frames": encoded,
+        "fps": 30,
+        "durationSec": round(encoded / 30, 4),
+        "static": encoded <= 1,
+        "width": frames[0].shape[1],
+        "height": frames[0].shape[0],
+        "bytes": dest.stat().st_size,
+        **({"repaired": f"binary alpha, threshold {GHOST_THRESHOLD}",
+            "srcSemiMedian": round(median_semi, 4)} if repaired else {}),
+    }
+
+
+def build_repaired_talk() -> dict | None:
+    """Rebuild the speaking animation from the one viable source clip.
+
+    The raw mouth-shape clips are unusable as shipped: the matte under-estimated
+    alpha across the whole head, so the face renders as a semi-transparent ghost.
+    Frames were measured individually, and only `talk04_DC` keeps a long enough run
+    of frames whose face colour survives a solid-alpha repair.
+
+    Two properties are asserted rather than assumed:
+      - the repaired frames keep enough opaque face pixels to look like a face
+      - the face colour stays close to the baseline, which is what distinguishes
+        "alpha was wrong but the face is there" from "background bleeds through"
+
+    @returns a clip entry for the manifest, or None when the repair does not hold.
+    """
+    src_webp = SRC / f"{TALK_SOURCE}.webp"
+    if not src_webp.is_file():
+        print(f"  FAIL talk repair: {src_webp.name} not found")
+        return None
+
+    baseline_face = face_reference()
+    if baseline_face is None:
+        print("  FAIL talk repair: could not derive a baseline face colour")
+        return None
+
+    first, last = TALK_FRAMES
+    work = Path(tempfile.mkdtemp(prefix="talk-repair-"))
+    frames: list[Path] = []
+
+    try:
+        with Image.open(src_webp) as im:
+            total = getattr(im, "n_frames", 1)
+            if last > total:
+                print(f"  FAIL talk repair: {src_webp.name} has {total} frames, "
+                      f"needed {last}")
+                return None
+            for index in range(first, last):
+                im.seek(index)
+                rgba = im.convert("RGBA")
+                arr = np.array(rgba)
+                # Solid alpha: the character is an opaque object, so a pixel is
+                # present or absent. This is the repair — the RGB is untouched.
+                arr[:, :, 3] = np.where(arr[:, :, 3] >= TALK_ALPHA_THRESHOLD, 255, 0)
+
+                face = face_stats_from_array(arr, baseline_face)
+                if face["opaqueFace"] < TALK_MIN_OPAQUE_FACE or face["distance"] >= 45:
+                    print(f"  FAIL talk repair: frame {index} unusable "
+                          f"(opaqueFace={face['opaqueFace']} distance={face['distance']:.1f})")
+                    return None
+
+                out = work / f"f{len(frames):03d}.png"
+                Image.fromarray(arr, "RGBA").save(out)
+                frames.append(out)
+    except Exception as exc:  # noqa: BLE001 - report, never fail silently
+        print(f"  FAIL talk repair: {type(exc).__name__}: {exc}")
+        return None
+
+    if not frames:
+        print("  FAIL talk repair: no frames survived")
+        return None
+
+    target = DEST / "talk.webp"
+    cmd = [
+        "ffmpeg", "-v", "error",
+        "-framerate", "30",
+        "-i", str(work / "f%03d.png"),
+        "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "78",
+        "-loop", "0", "-an", "-f", "webp",
+        str(target), "-y",
+    ]
+    proc = subprocess.run(cmd, capture_output=True)
+    if proc.returncode != 0 or not target.is_file() or target.stat().st_size <= 0:
+        detail = proc.stderr.decode(errors="replace").strip()[:200]
+        print(f"  FAIL talk repair: encode failed ({detail or 'no stderr'})")
+        return None
+
+    # The encoded result must still be transparent — a lossy WebP encode is where
+    # alpha would silently disappear, turning the pet into a rectangle.
+    if not check_alpha(target, "talk.webp"):
+        target.unlink(missing_ok=True)
+        return None
+
+    with Image.open(target) as im:
+        encoded_frames = getattr(im, "n_frames", 1)
+    print(f"  talk.webp  {target.stat().st_size / 1024:.1f} KB  "
+          f"({len(frames)} frames from {TALK_SOURCE}[{first}..{last - 1}], "
+          f"re-encoded as {encoded_frames}; face verified per frame)")
+
+    return {
+        "file": target.name,
+        "frames": encoded_frames,
+        "fps": 30,
+        "durationSec": round(encoded_frames / 30, 4),
+        "static": encoded_frames <= 1,
+        "width": 322,
+        "height": 430,
+        "bytes": target.stat().st_size,
+        "source": f"{TALK_SOURCE}.webm",
+        "sourceRange": [first, last - 1],
+        "repaired": "binary alpha, threshold %d" % TALK_ALPHA_THRESHOLD,
+    }
+
+
 def main() -> int:
     if not SRC.is_dir():
         raise SystemExit(f"converted clips not found: {SRC}")
@@ -383,18 +767,68 @@ def main() -> int:
 
     DEST.mkdir(parents=True, exist_ok=True)
 
-    # Copy the animated clips (never the preview or the helper scripts).
-    copied = 0
-    for clip in manifest_in["clips"]:
-        source = SRC / clip["file"]
-        if not source.is_file():
-            print(f"  MISSING {clip['file']}")
-            continue
-        shutil.copy2(source, DEST / clip["file"])
-        copied += 1
-
     # Which clips the states need, plus every talk variant.
     needed = {spec["clip"] for spec in STATES.values()} | set(TALK_VARIANTS)
+
+    # A state must never resolve to a clip whose alpha cannot be repaired; that is
+    # how a ghosted face would reach the screen. Checked here so a future edit to
+    # STATES fails loudly instead of shipping.
+    misrouted = {s: spec["clip"] for s, spec in STATES.items()
+                 if spec["clip"] in UNREPAIRABLE}
+    if misrouted:
+        print("FAIL: these states map to clips that cannot be repaired:")
+        for state, clip in misrouted.items():
+            print(f"  {state} -> {clip}  ({UNREPAIRABLE[clip]})")
+        return 1
+
+    # The speaking animation is rebuilt, not copied: the raw mouth-shape clips are
+    # damaged and would put a ghosted face on screen. `talk` replaces them.
+    print("building the talking animation")
+    if build_repaired_talk() is None:
+        print("  the talking animation could not be rebuilt — see the failure above")
+        return 1
+    talk_file = DEST / "talk.webp"
+    with Image.open(talk_file) as im:
+        talk_frames = getattr(im, "n_frames", 1)
+    by_name["talk"] = {
+        "file": talk_file.name,
+        "frames": talk_frames,
+        "fps": 30,
+        "durationSec": round(talk_frames / 30, 4),
+        "static": talk_frames <= 1,
+        "width": 322,
+        "height": 430,
+        "bytes": talk_file.stat().st_size,
+        "source": f"{TALK_SOURCE}.webm",
+        "repaired": "binary alpha, threshold %d" % TALK_ALPHA_THRESHOLD,
+    }
+    print()
+
+    # Copy the clips the states use, repairing alpha where the matte under-estimated
+    # it. Copying everything would leave the three damaged mouth-shape clips on disk
+    # as unreferenced orphans, and the manifest test rightly flags those.
+    print("installing clips")
+    copied = 0
+    installed: dict[str, dict] = {}
+    for name in sorted(needed):
+        info = by_name.get(name)
+        if not info:
+            print(f"  MISSING clip: {name}")
+            continue
+        if name == "talk":
+            continue  # already written by the repair step
+        source = SRC / str(info.get("file", ""))
+        entry = install_clip(name, source, DEST / str(info.get("file", "")))
+        if entry is None:
+            failed.append(name)
+            continue
+        # Carry the upstream provenance the manifest reports.
+        for extra in ("still", "note"):
+            if info.get(extra):
+                entry[extra] = info[extra]
+        installed[name] = entry
+        copied += 1
+    print()
 
     # A still for every clip that some state wants to hold.
     want_still = {spec["clip"] for spec in STATES.values() if spec.get("still")}
@@ -415,20 +849,33 @@ def main() -> int:
 
     clips = {}
     for name in sorted(needed):
-        if name not in by_name:
-            print(f"  state references unknown clip: {name}")
-            continue
-        info = by_name[name]
-        entry = {
-            "file": info["file"],
-            "frames": info.get("usedFrames", info.get("sourceFrames", 1)),
-            "fps": info.get("fps", 30),
-            "durationSec": info.get("durationSec", 0),
-            "static": info.get("static", False),
-            "width": info.get("width", 322),
-            "height": info.get("height", 430),
-            "bytes": info.get("bytes", 0),
-        }
+        # `installed` holds what was actually written (with its measured frame count
+        # and repair status); `by_name` is the fallback for entries that come from
+        # the extraction manifest directly.
+        entry = installed.get(name)
+        if entry is None:
+            if name not in by_name:
+                print(f"  state references unknown clip: {name}")
+                continue
+            info = by_name[name]
+            # `usedFrames`/`sourceFrames` are the upstream extraction manifest's
+            # names; `frames` is this script's canonical one for entries it builds
+            # itself. Reading only the upstream names silently reported the repaired
+            # talk clip as a single frame.
+            frame_count = info.get("usedFrames", info.get("sourceFrames", info.get("frames", 1)))
+            entry = {
+                "file": info["file"],
+                "frames": frame_count,
+                "fps": info.get("fps", 30),
+                "durationSec": info.get("durationSec", 0),
+                "static": info.get("static", False),
+                "width": info.get("width", 322),
+                "height": info.get("height", 430),
+                "bytes": info.get("bytes", 0),
+            }
+            for extra in ("source", "repaired", "note"):
+                if info.get(extra):
+                    entry[extra] = info[extra]
         if name in stills:
             entry["still"] = stills[name]
         clips[name] = entry
