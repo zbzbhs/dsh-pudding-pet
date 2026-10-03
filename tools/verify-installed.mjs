@@ -87,9 +87,10 @@ catch (error) { note(false, 'resolveConfig() accepts the module', error.message)
   try {
     host.apply(ctx, {});
     note(true, 'apply(ctx) runs without throwing');
-    note(routes.length === 2, 'registers the two synthesis routes', 'count=' + routes.length);
+    note(routes.length === 3, 'registers three routes', 'count=' + routes.length);
     note(routes.includes('/pudding-pet/tts'), 'tts route registered');
     note(routes.includes('/pudding-pet/voices'), 'voices route registered');
+    note(routes.includes('/pudding-pet/art'), 'local art route registered');
   } catch (error) {
     note(false, 'apply(ctx) runs without throwing', error.message);
   }

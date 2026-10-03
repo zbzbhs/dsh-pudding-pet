@@ -1,0 +1,48 @@
+支持本地自定义形象：不动代码换角色，素材不进公开仓库
+
+需求：把桌宠形象换成本地已有的另一套素材（真实汤姆猫），且
+「细节状态也要」，即状态数要比原来的 10 个更多。
+
+架构：本地覆盖层
+  - 片段放在 assets/local/，该目录被 .gitignore 忽略 —— 是用户自己的素材，
+    不属于本项目授权范围，也不随仓库分发。仓库始终只含原创布丁（CC0）。
+  - DSH 的客户端路由只服务 client.*.js，素材无法按 URL 从包内取，
+    因此新增宿主路由 GET /pudding-pet/art 来提供：
+      ?            → 清单（含状态映射）与磁盘上真实存在的文件列表
+      ?name=<file> → 该文件（限 .webp/.png/.gif/.jpg/.svg，basename-only，
+                     拒绝路径穿越与类型混淆）
+  - 无 assets/local/ 时返回 { available: false }，客户端沿用内置形象。
+
+客户端
+  - createClipVisual(art)：把清单变成与内置形象同接口的适配器
+  - 状态映射 14 个（原 10 个）：idle/listen/think/work/waiting/talk/happy/
+    sad/sleep/poke/eat/hungry/knockout/spicy
+  - 说话时轮换 3 个口型；轮换从主选开始（原本首个口型会跳过主选）
+  - 只设高度、宽度按画布宽高比推导，不拉伸变形
+  - 图片加载失败时隐藏而非显示裂图
+  - PetWidget.setVisual()：素材晚到时就地替换形象，不重挂载组件
+
+两个实测结论（决定了实现方式）
+  - VP9 alpha 真实存在但与解码器有关：
+      ffmpeg -c:v libvpx-vp9  → alpha=0 占 77.9%   ✅
+      ffmpeg 默认解码器        → alpha=0 占 0.0%    ❌ 全不透明
+  - Chromium 里 VP9 <video> 不可用（MEDIA_ERR_SRC_NOT_SUPPORTED），
+    而动画 WebP 在 <img> 里 alpha 完整（corners=0,0,0,0 centre=255）。
+    → 素材统一转成带 alpha 的动画 WebP。
+  - 编码忠实度已逐像素核验：角色区平均色差 4.7~6.5（满值 255），属有损压缩正常范围。
+
+素材工具
+  - tools/install-local-art.py：复制片段 → 抽静态帧 → 写清单。
+    静态帧从「已校验过 alpha 的 WebP」用 PIL 导出（比重新抽帧可靠；
+    单帧片段的 ffmpeg select 滤镜匹配不到任何帧）。
+    每个静态帧都要过 alpha 自检（透明区 > 30%），失败即报错而非静默。
+
+测试（新增 3 个文件，78 项）
+  - dev/test-art-route.mjs    22 项：围栏、清单、无素材降级、文件名安全、真实 WebP
+  - dev/test-art-visual.mjs   37 项：适配器接口、状态映射、静止帧、口型轮换、缩放、
+                                      未知状态、销毁、加载失败降级
+  - dev/test-art-manifest.mjs 19 项：清单与磁盘一致、孤儿文件、字节数、
+                                      状态映射健全性；无素材时跳过并退出码 0
+  CI 离线步骤 11 → 14。
+
+验证：离线 14 组全绿；host-hardening 100/100。

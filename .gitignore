@@ -20,6 +20,21 @@ yarn-error.log*
 tmp/
 scratch/
 
+# ---------------------------------------------------------------------------
+# Locally-supplied character art — NEVER commit this.
+#
+# `assets/local/` is where a user drops their own clips (see
+# tools/install-local-art.py). The clips this repository ships are the original
+# "Pudding" character, which is CC0. Anything placed in `assets/local/` is the
+# user's own material and is deliberately outside the repository's licence — and
+# in the case of game-derived artwork, redistributing it is prohibited by the
+# game's own terms.
+#
+# The directory is referenced by the host route only when it exists, so a fresh
+# clone with no local art behaves exactly as before.
+# ---------------------------------------------------------------------------
+assets/local/
+
 # NOTE: lib/client.js IS committed on purpose.
 # It is the artifact DSH actually loads, and the build is a deterministic text
 # substitution (tools/build.mjs), so keeping it in the repo lets the plugin be

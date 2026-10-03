@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>alpha render test</title>
+<style>
+  html,body{margin:0;background:#ff00ff}
+  .row{display:flex;gap:0}
+  img,video{display:block;width:322px;height:430px;background:transparent}
+</style></head>
+<body>
+<!-- Both are drawn on a magenta background. If alpha is preserved, the corners
+     stay magenta; if it is lost, the clip appears as an opaque rectangle. -->
+<img id="w" src="anim.webp" alt="webp">
+<video id="v" src="talk04_IC.webm" muted autoplay playsinline loop></video>
+<pre id="out" style="display:none"></pre>
+<script>
+// Sample both renderings after a delay, using an offscreen canvas.
+(function () {
+  var out = document.getElementById('out');
+  var log = [];
+  function L() { log.push([].slice.call(arguments).join(' ')); }
+  setTimeout(function () {
+    var canvas = document.createElement('canvas');
+    canvas.width = 322; canvas.height = 430;
+    var ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    function probe(el, label) {
+      if (!el) return null;
+      var w = el.naturalWidth || el.videoWidth || 0;
+      var h = el.naturalHeight || el.videoHeight || 0;
+      if (!w || !h) { L(label + ': no intrinsic size (w=' + w + ' h=' + h + ')'); return null; }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      try { ctx.drawImage(el, 0, 0, canvas.width, canvas.height); }
+      catch (e) { L(label + ': drawImage threw ' + e.message); return null; }
+      var px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      var at = function (x, y) { return px[(y * canvas.width + x) * 4 + 3]; };
+      var corners = [at(1, 1), at(canvas.width - 2, 1), at(1, canvas.height - 2), at(canvas.width - 2, canvas.height - 2)];
+      var centre = at(Math.floor(canvas.width / 2), Math.floor(canvas.height * 0.62));
+      var clear = corners.filter(function (a) { return a < 16; }).length;
+      L(label + ': size=' + w + 'x' + h + ' corners=' + corners.join(',') + ' centre=' + centre
+        + ' -> ' + (clear >= 3 ? 'ALPHA OK' : 'ALPHA LOST'));
+      return { corners: corners, centre: centre, alphaOk: clear >= 3 };
+    }
+
+    var w = probe(document.getElementById('w'), 'animated WebP');
+    var v = probe(document.getElementById('v'), 'VP9 webm video');
+    out.textContent = log.join('\n');
+    document.title = 'RESULT:' + JSON.stringify({
+      webp: w, video: v,
+      videoReadyState: document.getElementById('v').readyState,
+      videoError: document.getElementById('v').error ? document.getElementById('v').error.code : null,
+    });
+  }, 2500);
+})();
+</script>
+</body></html>

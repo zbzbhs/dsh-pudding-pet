@@ -94,9 +94,14 @@ console.log('\n=== apply() against a realistic host context ===');
     note(false, 'apply(ctx) runs without throwing', error.message);
   }
   note(Array.isArray(injected) && injected.includes('webServer'), 'injects webServer', JSON.stringify(injected));
-  note(registered.length === 2, 'registers exactly two routes', 'count=' + registered.length);
-  note(registered.every((r) => r.kind === 'exact'), 'both routes are exact matches');
-  note(registered.every((r) => typeof r.handler === 'function'), 'both routes have handlers');
+  // Synthesis, the voice catalog, and local art.
+  note(registered.length === 3, 'registers exactly three routes', 'count=' + registered.length);
+  note(registered.every((r) => r.kind === 'exact'), 'all routes are exact matches');
+  note(registered.every((r) => typeof r.handler === 'function'), 'all routes have handlers');
+  const paths = registered.map((r) => r.path).sort();
+  note(paths.includes('/pudding-pet/tts'), 'tts route registered');
+  note(paths.includes('/pudding-pet/voices'), 'voices route registered');
+  note(paths.includes('/pudding-pet/art'), 'local art route registered');
 }
 
 console.log('\n=== the vendored synthesis module loads ===');

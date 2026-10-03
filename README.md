@@ -204,6 +204,60 @@ node tools/build.mjs --check   # 检查产物是否是最新的（CI 用）
 
 语音、拖动、设置、位置记忆都跟形象解耦，**换形象不用动这些**。
 
+### 换成你自己的形象（不用改代码）
+
+除了改代码，还有一个**不改代码的换装方式**：把片段放进 `assets/local/`。
+
+这个目录是 **git-ignored** 的 —— 放进去的东西是**你自己的素材**，不属于本项目的授权范围，
+也不会随仓库分发。仓库本身始终只含原创的布丁形象（CC0）。
+
+#### 怎么放
+
+```
+assets/local/
+├── manifest.json        ← 映射表（状态 → 片段）
+├── blink.webp           ← 动画片段（带透明通道）
+├── blink.still.png      ← 需要「静止」的状态用静态图
+└── ...
+```
+
+`manifest.json` 的结构：
+
+```json
+{
+  "character": { "id": "my-cat", "label": "我的猫" },
+  "canvas": { "width": 322, "height": 430 },
+  "clips": {
+    "blink": { "file": "blink.webp", "still": "blink.still.png", "frames": 3 }
+  },
+  "states": {
+    "idle": { "clip": "blink", "loop": true, "breath": true },
+    "listen": { "clip": "listen", "still": true }
+  },
+  "talkVariants": ["talk04_IC", "talk02_IC", "talk04_DC"]
+}
+```
+
+**关键约束**：
+
+- 片段必须是**带透明通道**的**动画 WebP**。VP9 `<video>` 在本环境不可用
+  （`MEDIA_ERR_SRC_NOT_SUPPORTED`），而 WebP 的 alpha 经实测完整保留。
+- 一个状态要么 `loop: true`（循环播动画），要么 `still: true`（播静态图）。
+  **`<img>` 里的动画 WebP 无法暂停**，所以需要「定格」的状态必须另配 `.still.png`。
+- `still: true` 的状态，其 clip **必须有 `still` 字段**，否则该状态没有画面
+  （`dev/test-art-manifest.mjs` 会检查这一条）。
+
+#### 一个可用的参考实现
+
+`tools/install-local-art.py` 是**从视频片段生成这套素材**的脚本（复制片段、抽静态帧、
+写清单）。它按本机素材的实际情况写的，但改一改就能用于你自己的片段 —— 特别是：
+
+- **抽帧必须用 `-c:v libvpx-vp9` 解码**，否则 alpha 全丢、画面变成不透明方块
+- 从**已生成并校验过 alpha 的 WebP** 里用 PIL 导出静态帧，比重新抽帧更可靠
+
+换装后**刷新页面**即可；`assets/local/` 的变化不需要重启
+（但**首次**引入 `assets/local/` 需要重启一次，因为宿主路由在启动时注册）。
+
 ---
 
 ## 本地开发与验证
@@ -222,6 +276,9 @@ node dev/test-audio-volume.mjs      # 播放音量：SSML 偏移不得被当成�
 node dev/test-settings-panel.mjs    # 设置面板：控件、持久化、区间夹紧、拖动阈值
 node dev/test-host-hardening.mjs    # 宿主路由加固：围栏、DNS rebinding、SSML 注入、缓存、中止
 node dev/test-cache-budget.mjs      # 合成缓存按字节限额（而非条数）并 LRU 驱逐
+node dev/test-art-route.mjs         # 本地素材路由：清单、文件服务、文件名安全
+node dev/test-art-visual.mjs        # 本地形象适配器：状态映射、静止帧、口型轮换
+node dev/test-art-manifest.mjs      # 本地素材清单一致性（无素材时跳过，退出码 0）
 node tools/verify-morph-mechanism.mjs  # 变声机制（重采样算术 + 代码特性检测）
 ```
 
