@@ -1,4 +1,4 @@
-# ---------------------------------------------------------------------------
+﻿# ---------------------------------------------------------------------------
 # CI for dsh-pudding-pet
 #
 # The project is zero-dependency by design, so NO job installs anything:
@@ -6,7 +6,7 @@
 # Every check below is a plain `node` script run against the committed tree.
 #
 # Three jobs:
-#   test      -- the offline suite (9 scripts). This is the gate.
+#   test      -- the offline suite (10 scripts). This is the gate.
 #   contract  -- the 35-assertion browser contract test in real Chromium.
 #   tts       -- real Edge TTS synthesis. ONLINE and therefore advisory:
 #                Microsoft may refuse a CI egress IP, so `continue-on-error`
@@ -72,6 +72,9 @@ jobs:
 
       - name: Host hardening (fence, rebinding, injection, cache, abort)
         run: node dev/test-host-hardening.mjs
+
+      - name: Cache byte budget (bounded by bytes, not entry count)
+        run: node dev/test-cache-budget.mjs
 
       - name: Pitch-shift mechanism (resampling arithmetic + bundle features)
         run: node tools/verify-morph-mechanism.mjs

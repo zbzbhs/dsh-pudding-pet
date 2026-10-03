@@ -404,8 +404,12 @@ console.log('\n=== fence: origin / host / method ===');
   check('dsh-app Origin is allowed (200)', r.status === 200, 'status=' + r.status);
 }
 {
+  // `Origin: null` comes from sandboxed iframes and data: pages, which are not
+  // this app, so it is refused rather than treated as "no origin". Not
+  // exploitable alone (a browser cannot forge Host, which must also be local),
+  // but it is the stricter reading of the same rule.
   const r = await call('/pudding-pet/tts', { query: 'text=' + fresh(), origin: 'null' });
-  check('Origin: "null" is allowed by the code as written', r.status === 200, 'status=' + r.status);
+  check('Origin: "null" is refused (403)', r.status === 403, 'status=' + r.status);
 }
 {
   const r = await call('/pudding-pet/tts', {
@@ -448,19 +452,21 @@ console.log('\n=== fence: origin / host / method ===');
   const before = fake.ssml.length;
   const r = await call('/pudding-pet/tts', { query: 'text=' + text, method: 'HEAD' });
   const synthesized = fake.ssml.length > before;
-  check('HEAD is accepted (200, as coded)', r.status === 200, 'status=' + r.status);
-  check('HEAD still performs a full synthesis', synthesized, 'ssml_frames=' + (fake.ssml.length - before));
-  check('HEAD writes a body at the handler level (Node suppresses it on the wire)',
-    r.body.length > 0, 'handler_bytes=' + r.body.length);
+  check('HEAD is accepted (200)', r.status === 200, 'status=' + r.status);
+  // HEAD is a probe, not a request for audio: Node discards the body on the wire,
+  // so synthesizing would be a wasted paid round trip. The route answers the
+  // headers and stops.
+  check('HEAD does NOT trigger synthesis', !synthesized, 'ssml_frames=' + (fake.ssml.length - before));
+  check('HEAD writes no body', r.body.length === 0, 'handler_bytes=' + r.body.length);
 }
 {
-  // A duplicated header is joined by Node into "cross-site, same-origin"; the
-  // fence compares the whole string, so the exact-match test no longer fires.
+  // A duplicated header is joined by Node into "cross-site, same-origin". The
+  // fence uses `includes`, so the joined form is still recognised as cross-site.
   const r = await call('/pudding-pet/tts', {
     query: 'text=' + fresh(),
     headers: { 'sec-fetch-site': 'cross-site, same-origin' },
   });
-  check('joined duplicate sec-fetch-site is NOT treated as cross-site', r.status === 200, 'status=' + r.status);
+  check('joined duplicate sec-fetch-site IS treated as cross-site (403)', r.status === 403, 'status=' + r.status);
 }
 {
   const r = await call('/pudding-pet/tts', { query: 'text=' + fresh(), secFetchSite: 'cross-site' });
@@ -828,11 +834,20 @@ console.log('\n=== error handling ===');
     r.timedOut === true && r.error === undefined, 'timedOut=' + r.timedOut + ' error=' + r.error);
 }
 {
-  // res without .on(): the close wiring sits outside the try/catch.
-  const bare = { statusCode: 0, writeHead() {}, end() {} };
+  // A `res` without `.on()` used to reject out of the guard, leaving no response.
+  // The close wiring is now inside a try/catch and answers 500 directly, so the
+  // caller always gets a reply.
+  //
+  // `end` must call `_settle` (which the harness assigns) or the call would never
+  // resolve here and the assertion would read as a timeout rather than a status.
+  const bare = {
+    statusCode: 0,
+    writeHead(code) { this.statusCode = code; },
+    end() { this._settle?.(); },
+  };
   const r = await call('/pudding-pet/tts', { query: 'text=' + fresh('nores'), res: bare, timeoutMs: 600 });
-  check('a res without .on() rejects out of the guard rather than silently succeeding',
-    r.status === 0 && typeof r.error === 'string', 'error=' + r.error);
+  check('a res without .on() is answered, not left hanging',
+    r.status === 500, 'status=' + r.status);
 }
 {
   const r = await call('/pudding-pet/tts', { query: 'text=' + fresh('after'), timeoutMs: 6000 });

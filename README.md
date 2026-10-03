@@ -220,6 +220,7 @@ node dev/test-client-engine.mjs     # 引擎选择与降级（宿主失败 → �
 node dev/test-cancel-race.mjs       # 取消竞态：按「停止」后不得回退成浏览器朗读
 node dev/test-settings-panel.mjs    # 设置面板：控件、持久化、区间夹紧、拖动阈值
 node dev/test-host-hardening.mjs    # 宿主路由加固：围栏、DNS rebinding、SSML 注入、缓存、中止
+node dev/test-cache-budget.mjs      # 合成缓存按字节限额（而非条数）并 LRU 驱逐
 node tools/verify-morph-mechanism.mjs  # 变声机制（重采样算术 + 代码特性检测）
 ```
 
@@ -264,7 +265,7 @@ slots 服务、locale 服务、假的会话事件流）来驱动真实插件代�
 
 | job | 跑什么 | 超时 |
 |---|---|---|
-| `test` | 上面那 9 条离线命令，每条独立一步（`build.mjs --check` 放最前，产物过期是最容易犯的错） | 5 分钟 |
+| `test` | 上面那 10 条离线命令，每条独立一步（`build.mjs --check` 放最前，产物过期是最容易犯的错） | 5 分钟 |
 | `contract` | 真实 Chromium 跑 `dev/test-contract.html`，再由 `tools/check-contract-result.mjs` 读 `RESULT:{…}` 并断言 `fail === 0` | 10 分钟 |
 | `tts` | `dev/test-host-tts.mjs`，需要联网 | 10 分钟 |
 
