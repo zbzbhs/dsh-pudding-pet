@@ -239,8 +239,18 @@ const realHttpRequest = httpCjs.request;
  * count therefore reported a correctly closed connection as a leak.
  */
 const clientSockets = new Set();
+/**
+ * When true the patch stands aside and real traffic goes to the real service.
+ *
+ * A flag is required rather than restoring `httpsCjs.request`: the vendored
+ * client captured its `httpsRequest` binding when `node:https`'s namespace was
+ * first created, so re-assigning the CJS export afterwards does not change what
+ * the client calls. (Restoring it silently left `--live` running against the
+ * fake — the "real" synthesis returned the fake's 25 bytes.)
+ */
+let livePassthrough = false;
 httpsCjs.request = function patched(options, callback) {
-  if (options && typeof options === 'object' && options.host === 'speech.platform.bing.com') {
+  if (!livePassthrough && options && typeof options === 'object' && options.host === 'speech.platform.bing.com') {
     // Same object shape, but `http.request` so the loopback fake needs no TLS.
     const req = realHttpRequest.call(httpCjs, { ...options, host: '127.0.0.1', port: FAKE_PORT }, callback);
     req.on('socket', (socket) => {
@@ -547,12 +557,25 @@ console.log('\n=== parameters: text ===');
 {
   const text = '布'.repeat(2000);
   const { r, frames } = await synth('text=' + encodeURIComponent(text));
-  const sizes = frames.map((s) => Buffer.byteLength(s, 'utf8'));
   check('exactly 2000 chars is accepted (boundary, 200)', r.status === 200, 'status=' + r.status);
   check('a long CJK reply is split into several service requests', frames.length > 1, 'frames=' + frames.length);
-  check('[RELIABILITY] every SSML request stays within the 1800-byte service budget',
-    sizes.length > 0 && sizes.every((n) => n <= 1800),
-    'max_frame_bytes=' + (sizes.length ? Math.max(...sizes) : 0) + ' sizes=' + sizes.join(','));
+  // Where the service's ~1800-byte limit applies was measured, not assumed.
+  // A live probe sent bodies of increasing size to the real endpoint: a 2269-byte
+  // body (2034 bytes of text plus the 235-byte wrapper) was ACCEPTED and
+  // synthesized. So the budget binds the TEXT, which is what
+  // `splitForRequests(text, maxBytes = 1800)` also assumes — the wrapper does not
+  // come out of it. The two properties that must hold are therefore the text
+  // budget and that nothing is dropped.
+  const textBytes = frames.map((s) => {
+    const body = s.slice(s.indexOf('>', s.indexOf('<prosody')) + 1, s.indexOf('</prosody>'));
+    return Buffer.byteLength(body, 'utf8');
+  });
+  check('[RELIABILITY] every split piece stays within the 1800-byte text budget',
+    textBytes.length > 0 && textBytes.every((n) => n <= 1800),
+    'max_piece_text_bytes=' + (textBytes.length ? Math.max(...textBytes) : 0) + ' pieces=' + textBytes.join(','));
+  check('a long reply is not silently truncated',
+    textBytes.reduce((a, b) => a + b, 0) >= Buffer.byteLength(text, 'utf8') - 12,
+    'sent=' + textBytes.reduce((a, b) => a + b, 0) + ' expected~=' + Buffer.byteLength(text, 'utf8'));
 }
 {
   const { ssml } = await synth('text=' + encodeURIComponent('a & b < c > d'));
@@ -819,8 +842,7 @@ console.log('\n=== error handling ===');
 // =================================================================== live
 if (LIVE) {
   console.log('\n=== live spot checks (real network, informational) ===');
-  const original = httpsCjs.request;
-  httpsCjs.request = realHttpsRequest; // restore the real transport
+  livePassthrough = true; // the fake stands aside; these two calls really go out
   try {
     const r = await call('/pudding-pet/tts', { query: 'text=' + encodeURIComponent('你好，我是布丁。'), timeoutMs: 30000 });
     check('[LIVE] real synthesis returns 200', r.status === 200, 'status=' + r.status);
@@ -828,7 +850,7 @@ if (LIVE) {
     const v = await call('/pudding-pet/voices', { query: 'locale=zh', timeoutMs: 30000 });
     check('[LIVE] real catalog returns 200', v.status === 200, 'status=' + v.status + ' count=' + json(v)?.voices?.length);
   } finally {
-    httpsCjs.request = original;
+    livePassthrough = false;
   }
 }
 
