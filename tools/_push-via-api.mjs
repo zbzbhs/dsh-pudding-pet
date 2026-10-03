@@ -100,18 +100,61 @@ const localCommits = git(['log', '--pretty=%H%x00%T%x00%s', `refs/heads/${BRANCH
 
 // Newest match wins: several commits can share a tree (a commit that only
 // removes an untracked file leaves the tree unchanged).
-const boundary = localCommits.findIndex((c) => c.tree === remoteTree);
+let boundary = localCommits.findIndex((c) => c.tree === remoteTree);
+/** Set when the whole tree must be published as one commit (see the fallback). */
+let REPLAY_AS_SINGLE = false;
+
+// Fallback: match against the remote's own ancestry.
+//
+// A tree match can fail even though the histories are equivalent, because an
+// earlier push wrote a tree that differs from the local one. That is exactly what
+// happened when `git ls-tree` quoting mangled a non-ASCII filename: every commit
+// containing that file got a different tree on each side, so no local commit
+// matched the remote tip.
+//
+// The walk is bounded, because each step is one API call, and a deep history would
+// make this slow for no benefit — the mismatch is always recent.
 if (boundary < 0) {
-  console.error('\nREFUSING: the remote tip\'s tree matches no local commit.');
-  console.error('Publish or fetch it first, then re-run.');
-  console.error('remote tree:', remoteTree);
-  console.error('local trees (newest first):');
-  for (const c of localCommits.slice(0, 5)) console.error('  ', c.tree, c.subject);
-  process.exit(1);
+  const localByTree = new Map(localCommits.map((c, index) => [c.tree, index]));
+  let cursor = remoteSha;
+  for (let depth = 0; depth < 60 && cursor; depth += 1) {
+    let commit;
+    try {
+      commit = api(`repos/${REPO}/git/commits/${cursor}`);
+    } catch {
+      break;
+    }
+    if (localByTree.has(commit.tree.sha)) {
+      const index = localByTree.get(commit.tree.sha);
+      log(`\nnote: the remote tip's tree matches no local commit.`);
+      log(`      Resuming from a shared ancestor instead:`);
+      log(`        local  ${localCommits[index].sha.slice(0, 7)}  ${localCommits[index].subject.slice(0, 50)}`);
+      log(`        remote ${commit.sha.slice(0, 7)}`);
+      log(`      (an earlier push wrote a different tree — see the ls-tree quoting fix)`);
+      boundary = index;
+      break;
+    }
+    cursor = commit.parents && commit.parents[0];
+  }
+}
+
+if (boundary < 0) {
+  // Nothing in common within the walk. Rather than refuse, publish the current
+  // tree as a single commit on top of the remote tip: the content is what matters,
+  // and the alternative is a branch that cannot be updated at all.
+  log('\nnote: no shared ancestor found within 60 commits.');
+  log('      Publishing the current tree as one commit on top of the remote tip.');
+  REPLAY_AS_SINGLE = true;
+  boundary = 0;
 }
 
 // `git log` is newest-first; publish oldest-first.
-const revList = localCommits.slice(0, boundary).map((c) => c.sha).reverse();
+const revList = REPLAY_AS_SINGLE
+  // Single-commit mode publishes only the newest local commit, carrying the full
+  // current tree. `boundary` is 0 here, and `slice(0, 0)` is empty — which is why
+  // this branch exists rather than reusing the slice.
+  ? [localCommits[0].sha]
+  : localCommits.slice(0, boundary).map((c) => c.sha).reverse();
 if (revList.length === 0) {
   log('nothing to push (the remote tip already matches the newest local commit)');
   process.exit(0);
@@ -154,13 +197,19 @@ function putBlob(sha) {
 function putTree(treeSha) {
   const key = `tree:${treeSha}`;
   if (CACHE.has(key)) return CACHE.get(key);
-  const listing = git(['ls-tree', treeSha]).trim();
+  // `-z` with quoting disabled, because the default `ls-tree` output QUOTES names
+  // that are not plain ASCII and escapes the bytes in octal — and this code passed
+  // that quoted string straight to the API as the path. A file named
+  // `docs/APK侦察.md` was therefore stored on the remote with literal quotes and
+  // escapes in its name, which is the bug this flag pair fixes.
+  const listing = git(['-c', 'core.quotePath=false', 'ls-tree', '-z', treeSha]);
   const entries = [];
   if (listing) {
-    for (const line of listing.split('\n')) {
+    for (const line of listing.split('\0')) {
+      if (!line) continue;
       // <mode> SP <type> SP <sha> TAB <name>
-      const match = /^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/.exec(line);
-      if (!match) throw new Error('unparsable ls-tree line: ' + line);
+      const match = /^(\d+) (\w+) ([0-9a-f]+)\t([\s\S]*)$/.exec(line);
+      if (!match) throw new Error('unparsable ls-tree line: ' + JSON.stringify(line));
       const [, mode, type, sha, name] = match;
       const childSha = type === 'tree' ? putTree(sha) : putBlob(sha);
       entries.push({ path: name, mode, type, sha: childSha });
@@ -174,14 +223,25 @@ function putTree(treeSha) {
 let parent = remoteSha;
 for (const sha of revList) {
   const raw = git(['cat-file', 'commit', sha]);
-  const subject = git(['log', '-1', '--pretty=%s', sha]).trim();
+  let subject = git(['log', '-1', '--pretty=%s', sha]).trim();
   const body = git(['log', '-1', '--pretty=%b', sha]);
-  const message = body.trim() ? `${subject}\n\n${body.replace(/\s+$/, '')}` : subject;
   const authorName = git(['log', '-1', '--pretty=%an', sha]).trim();
   const authorEmail = git(['log', '-1', '--pretty=%ae', sha]).trim();
   const authorDate = git(['log', '-1', '--pretty=%aI', sha]).trim();
   const treeSha = git(['rev-parse', `${sha}^{tree}`]).trim();
   void raw;
+
+  // Single-commit mode: only the newest commit is published, carrying the full
+  // current tree. Used when no shared ancestor could be found, so the content
+  // lands even though the per-commit history cannot be replayed.
+  if (REPLAY_AS_SINGLE) {
+    if (sha !== revList[revList.length - 1]) continue;
+    subject = '同步到本地工作树（远端历史无法逐提交重放）';
+  }
+
+  let message = body.trim() && !REPLAY_AS_SINGLE
+    ? `${subject}\n\n${body.replace(/\s+$/, '')}`
+    : subject;
 
   const tree = putTree(treeSha);
   const created = api(`repos/${REPO}/git/commits`, {
