@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>变声机制验证</title></head>
+<body><pre id="out">running…</pre>
+<script>
+// Does `playbackRate` + `preservesPitch = false` actually change pitch?
+//
+// This is the mechanism the pet relies on to push speech past the TTS service's
+// own pitch ceiling, so it must be verified rather than assumed.
+//
+// Two earlier attempts used a live AudioContext and measured no signal at all:
+// chrome-headless-shell has no audio device, so the realtime graph never
+// advances. `OfflineAudioContext` renders the graph on the CPU without any
+// device, which makes the result both measurable and deterministic.
+//
+// Frequency is measured by counting zero crossings in the rendered buffer —
+// no FFT, no analyser, no timing dependence.
+(function () {
+  var log = [];
+  function L() { log.push([].slice.call(arguments).join(' ')); }
+  function flush() { document.getElementById('out').textContent = log.join('\n'); }
+
+  var OfflineCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  var probe = document.createElement('audio');
+  L('OfflineAudioContext          :', !!OfflineCtor);
+  L('preservesPitch on element    :', 'preservesPitch' in probe);
+  if (!OfflineCtor) { flush(); return; }
+
+  var SR = 48000;
+  var SECONDS = 1;
+  var TONE = 440;
+
+  /** Frequency of a buffer, from the zero-crossing rate. */
+  function measureHz(channel, sampleRate) {
+    // Ignore the first and last 10% so ramp-in/out cannot skew the count.
+    var start = Math.floor(channel.length * 0.1);
+    var end = Math.floor(channel.length * 0.9);
+    var crossings = 0;
+    var prev = channel[start];
+    for (var i = start + 1; i < end; i++) {
+      var cur = channel[i];
+      if ((prev < 0 && cur >= 0) || (prev >= 0 && cur < 0)) crossings++;
+      prev = cur;
+    }
+    var seconds = (end - start) / sampleRate;
+    // Two crossings per cycle.
+    return crossings / 2 / seconds;
+  }
+
+  /**
+   * Render a 440 Hz tone at `rate`, with pitch compensation either on or off.
+   * @returns a promise for the measured frequency.
+   */
+  function render(rate, preservesPitch) {
+    var ctx = new OfflineCtor(1, SR * SECONDS, SR);
+    var buffer = ctx.createBuffer(1, SR * SECONDS, SR);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < data.length; i++) {
+      data[i] = Math.sin(2 * Math.PI * TONE * i / SR) * 0.7;
+    }
+    var source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+    if ('preservesPitch' in source) source.preservesPitch = preservesPitch;
+    source.connect(ctx.destination);
+    source.start();
+    return ctx.startRendering().then(function (rendered) {
+      return measureHz(rendered.getChannelData(0), SR);
+    });
+  }
+
+  render(1.0, true).then(function (base) {
+    L('');
+    L('rate 1.00, compensation on   -> ' + base.toFixed(1) + ' Hz');
+    return render(1.4, false).then(function (fast) {
+      L('rate 1.40, compensation off  -> ' + fast.toFixed(1) + ' Hz');
+      return render(1.4, true).then(function (compensated) {
+        L('rate 1.40, compensation on   -> ' + compensated.toFixed(1) + ' Hz');
+        var ratio = base > 0 ? fast / base : 0;
+        var ratioOn = base > 0 ? compensated / base : 0;
+        L('');
+        L('ratio (compensation off) :', ratio.toFixed(3), '≈1.40 means pitch moved');
+        L('ratio (compensation on)  :', ratioOn.toFixed(3), '≈1.00 means pitch held');
+        var ok = ratio > 1.30 && ratio < 1.50 && ratioOn > 0.9 && ratioOn < 1.1;
+        L('');
+        L('verdict :', ok
+          ? 'CONFIRMED — playbackRate shifts pitch only when compensation is off'
+          : 'NOT confirmed — see ratios above');
+        L('');
+        L('This verifies the browser mechanism. It does not exercise the TTS service.');
+        flush();
+        document.title = 'RESULT:' + JSON.stringify({
+          baseHz: Math.round(base),
+          shiftedHz: Math.round(fast),
+          compensatedHz: Math.round(compensated),
+          ratioOff: Number(ratio.toFixed(3)),
+          ratioOn: Number(ratioOn.toFixed(3)),
+          mechanismConfirmed: ok
+        });
+      });
+    });
+  }).catch(function (error) {
+    L('render failed:', error && error.message);
+    flush();
+  });
+})();
+</script>
+</body></html>

@@ -202,28 +202,71 @@ node tools/build.mjs --check   # 检查产物是否是最新的（CI 用）
 
 ## 本地开发与验证
 
-`dev/` 目录里有几个不参与运行的工具：
+`dev/` 和 `tools/` 里是不参与运行的工具。全部检查都是普通 `node` 脚本，
+**不需要安装任何依赖**：
 
 ```sh
-# 语音实验室：试听音色和变声强度（改参数前先听）
-node dev/serve.mjs
-# 打开 http://127.0.0.1:8791/dev/voice-lab.html
+node tools/build.mjs --check        # 构建产物是否最新（改源码忘构建是最常见的错）
+node tools/verify-host.mjs          # 宿主契约：无 Config、路由注册、vendored 模块、署名
+node tools/inspect-exports.mjs      # client bundle 的导出结构
+node dev/test-speech-bridge.mjs     # 朗读桥：文本提取、晚挂载重试、默认静音
+node dev/test-client-engine.mjs     # 引擎选择与降级（宿主失败 → 浏览器）
+node tools/verify-morph-mechanism.mjs  # 变声机制（重采样算术 + 代码特性检测）
+```
 
-# 契约测试：在真实 Chromium 里跑插件的真实代码（mock 的是 DSH，不是插件）
+需要联网（会真的调用 Edge TTS 合成）：
+
+```sh
+node dev/test-host-tts.mjs          # 路由、围栏、缓存、参数钳制、真实合成
+```
+
+需要真实 Chromium：
+
+```sh
+# 契约测试：跑插件的真实代码（mock 的是 DSH，不是插件）
 chrome-headless-shell --headless --disable-gpu --no-sandbox \
-  --virtual-time-budget=14000 --dump-dom \
-  "file:///<绝对路径>/dev/test-contract.html"
-# 读 document.title 拿结果：RESULT:{"pass":35,"fail":0}
+  --virtual-time-budget=16000 --dump-dom \
+  "file:///<绝对路径>/dev/test-contract.html" > dom.html
+node tools/check-contract-result.mjs dom.html
 ```
 
 `dev/test-contract.html` 用一个最小化的 DSH 替身（模块加载器、两阶段 React、
 slots 服务、locale 服务、假的会话事件流）来驱动真实插件代码，覆盖 35 项断言：
 挂载、指针事件、`sessions.retain` 调用、朗读触发、Markdown 清洗、销毁清理。
 
+`dev/probe-morph-mechanism.html` 是给**真实浏览器**看的：它验证
+`playbackRate` + `preservesPitch = false` 确实改变音高。headless 里跑不了
+（没有音频设备，`OfflineAudioContext` 的渲染 promise 在虚拟时间下不结算），
+所以仓库里另有一个不依赖音频设备的算术验证（`tools/verify-morph-mechanism.mjs`）。
+
 **验证的边界（如实说明）**：headless 环境下 `requestAnimationFrame` 不触发，
 所以**动画的运动过程无法用截图证明** —— 能证明的是静态姿势、状态切换、
-样式注入、以及朗读链路正确。动画观感请在真实浏览器里看 `dev/` 之外的
+样式注入、以及朗读链路正确。动画观感请在真实浏览器里看
 `assets/pudding.js` 或上游形象的 `preview.html`。
+
+### 持续集成
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) 在 `push` 到 `main` 和
+每个 `pull_request` 上跑同样的检查。项目零依赖，所以**整个工作流不装任何东西**
+（没有 `npm install`），只有 `node` 脚本和一次浏览器。
+
+三个 job：
+
+| job | 跑什么 | 超时 |
+|---|---|---|
+| `test` | 上面那 5 条离线命令，每条独立一步（`build.mjs --check` 放最前，产物过期是最容易犯的错） | 5 分钟 |
+| `contract` | 真实 Chromium 跑 `dev/test-contract.html`，再由 `tools/check-contract-result.mjs` 读 `RESULT:{…}` 并断言 `fail === 0` | 10 分钟 |
+| `tts` | `dev/test-host-tts.mjs`，需要联网 | 10 分钟 |
+
+`tts` 是**可选** job（`continue-on-error: true`）：它要打微软的公开朗读端点，
+而 CI 的出口 IP 可能被拒 —— 那不能说明插件有问题。所以它失败**不会**让整个 CI 变红，
+但日志里会明确写出来。真正的门是 `test` 和 `contract`。
+
+Chromium 由 `browser-actions/setup-chrome@v1` 提供：ubuntu-24.04 上 apt 的
+`chromium-browser` 只是个 snap 转发壳，在 runner 上跑不起来。
+
+**`tools/verify-installed.mjs` 不在 CI 里** —— 它校验的是本机 DSH profile 里已安装的副本，
+runner 上没有 profile，必然失败。它是给本地用的。
 
 ---
 

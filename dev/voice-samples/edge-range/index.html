@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>Edge TTS 变声范围</title><style>
-body{margin:0;padding:24px;background:#1b1c1e;color:#e8eaed;font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+body{margin:0;padding:24px;background:#1b1c1e;color:#e8eaed;
+ font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
 h1{font-size:19px;margin:0 0 6px}
 h2{font-size:14px;color:#4FB6A6;margin:24px 0 10px;padding-bottom:6px;border-bottom:1px solid #3a3d42}
 p.sub{color:#a3a8b0;font-size:12.5px;margin:0 0 4px}
@@ -9,176 +10,59 @@ figure{margin:0;padding:11px 13px;background:#232427;border:1px solid #3a3d42;bo
 figcaption{color:#4FB6A6;font-size:12.5px;font-weight:600;margin-bottom:7px}
 audio{width:100%;display:block}
 .meta{color:#7c828b;font-size:11px;margin-top:6px;font-family:ui-monospace,Consolas,monospace}
+.fail{color:#e8a85c;font-size:12px;padding:9px 0}
 .note{margin-top:26px;padding-top:14px;border-top:1px solid #3a3d42;color:#7c828b;font-size:12px;line-height:1.75}
 code{background:#2b2d31;padding:1px 5px;border-radius:4px}
 </style></head><body>
 <h1>Edge TTS 变声范围实测</h1>
 <p class="sub">音色 zh-CN-XiaoyiNeural · 同一句话 · 共 29 个变体</p>
-<p class="sub">相同哈希 = 参数被服务端钳制，这是判定饱和的依据。</p>
-
+<p class="sub">同一哈希 = 服务端已钳制，这是判定饱和的依据。</p>
 <h2>Hz 写法</h2>
 <div class="grid">
-<figure>
-  <figcaption>+0Hz</figcaption>
-  <audio controls preload="none" src="hz-p0Hz.mp3"></audio>
-  <div class="meta">26928 B · 9ce543433da195be</div>
-</figure>
-<figure>
-  <figcaption>+10Hz</figcaption>
-  <audio controls preload="none" src="hz-p10Hz.mp3"></audio>
-  <div class="meta">26928 B · 9901fa8999c0c047</div>
-</figure>
-<figure>
-  <figcaption>+20Hz</figcaption>
-  <audio controls preload="none" src="hz-p20Hz.mp3"></audio>
-  <div class="meta">26928 B · 28db83657fa925ae</div>
-</figure>
-<figure>
-  <figcaption>+30Hz</figcaption>
-  <audio controls preload="none" src="hz-p30Hz.mp3"></audio>
-  <div class="meta">26928 B · 9ebe2643d91ab83d</div>
-</figure>
-<figure>
-  <figcaption>+40Hz</figcaption>
-  <audio controls preload="none" src="hz-p40Hz.mp3"></audio>
-  <div class="meta">26928 B · 33369982b484d48e</div>
-</figure>
-<figure>
-  <figcaption>+50Hz</figcaption>
-  <audio controls preload="none" src="hz-p50Hz.mp3"></audio>
-  <div class="meta">26928 B · 0a9c04868c444bd6</div>
-</figure>
-<figure>
-  <figcaption>+60Hz</figcaption>
-  <audio controls preload="none" src="hz-p60Hz.mp3"></audio>
-  <div class="meta">26928 B · c27379fe3710cea4</div>
-</figure>
-<figure>
-  <figcaption>+70Hz</figcaption>
-  <audio controls preload="none" src="hz-p70Hz.mp3"></audio>
-  <div class="meta">27072 B · e959fb7a6a3b30c8</div>
-</figure>
-<figure>
-  <figcaption>+80Hz</figcaption>
-  <audio controls preload="none" src="hz-p80Hz.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
-<figure>
-  <figcaption>+90Hz</figcaption>
-  <audio controls preload="none" src="hz-p90Hz.mp3"></audio>
-  <div class="meta">26928 B · ce2e19aa95707975</div>
-</figure>
-<figure>
-  <figcaption>+100Hz</figcaption>
-  <audio controls preload="none" src="hz-p100Hz.mp3"></audio>
-  <div class="meta">26928 B · ce2e19aa95707975</div>
-</figure>
-<figure>
-  <figcaption>+150Hz</figcaption>
-  <audio controls preload="none" src="hz-p150Hz.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
-<figure>
-  <figcaption>+200Hz</figcaption>
-  <audio controls preload="none" src="hz-p200Hz.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
+<figure><figcaption>+0Hz</figcaption><audio controls preload="none" src="hz-p0Hz.mp3"></audio><div class="meta">26928 B · 9ce543433da195be</div></figure>
+<figure><figcaption>+10Hz</figcaption><audio controls preload="none" src="hz-p10Hz.mp3"></audio><div class="meta">26928 B · 9901fa8999c0c047</div></figure>
+<figure><figcaption>+20Hz</figcaption><audio controls preload="none" src="hz-p20Hz.mp3"></audio><div class="meta">26928 B · 28db83657fa925ae</div></figure>
+<figure><figcaption>+30Hz</figcaption><audio controls preload="none" src="hz-p30Hz.mp3"></audio><div class="meta">26928 B · 9ebe2643d91ab83d</div></figure>
+<figure><figcaption>+40Hz</figcaption><audio controls preload="none" src="hz-p40Hz.mp3"></audio><div class="meta">26928 B · 33369982b484d48e</div></figure>
+<figure><figcaption>+50Hz</figcaption><audio controls preload="none" src="hz-p50Hz.mp3"></audio><div class="meta">26928 B · 0a9c04868c444bd6</div></figure>
+<figure><figcaption>+60Hz</figcaption><audio controls preload="none" src="hz-p60Hz.mp3"></audio><div class="meta">26928 B · c27379fe3710cea4</div></figure>
+<figure><figcaption>+70Hz</figcaption><audio controls preload="none" src="hz-p70Hz.mp3"></audio><div class="meta">27072 B · e959fb7a6a3b30c8</div></figure>
+<figure><figcaption>+80Hz</figcaption><audio controls preload="none" src="hz-p80Hz.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
+<figure><figcaption>+90Hz</figcaption><audio controls preload="none" src="hz-p90Hz.mp3"></audio><div class="meta">26928 B · ce2e19aa95707975</div></figure>
+<figure><figcaption>+100Hz</figcaption><audio controls preload="none" src="hz-p100Hz.mp3"></audio><div class="meta">26928 B · ce2e19aa95707975</div></figure>
+<figure><figcaption>+150Hz</figcaption><audio controls preload="none" src="hz-p150Hz.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
+<figure><figcaption>+200Hz</figcaption><audio controls preload="none" src="hz-p200Hz.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
 </div>
-
 <h2>百分比写法</h2>
 <div class="grid">
-<figure>
-  <figcaption>+0%</figcaption>
-  <audio controls preload="none" src="pct-p0%.mp3"></audio>
-  <div class="meta">26928 B · 9ce543433da195be</div>
-</figure>
-<figure>
-  <figcaption>+10%</figcaption>
-  <audio controls preload="none" src="pct-p10%.mp3"></audio>
-  <div class="meta">26928 B · 83fa9f86c468f99a</div>
-</figure>
-<figure>
-  <figcaption>+25%</figcaption>
-  <audio controls preload="none" src="pct-p25%.mp3"></audio>
-  <div class="meta">26928 B · 6b5e552eab786280</div>
-</figure>
-<figure>
-  <figcaption>+50% · 失败</figcaption>
-  <audio controls preload="none" src="pct-p50%.mp3"></audio>
-  <div class="meta">0 B · edge-tts: websocket upgrade refused (HTTP 503)</div>
-</figure>
-<figure>
-  <figcaption>+75%</figcaption>
-  <audio controls preload="none" src="pct-p75%.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
-<figure>
-  <figcaption>+100%</figcaption>
-  <audio controls preload="none" src="pct-p100%.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
-<figure>
-  <figcaption>+150%</figcaption>
-  <audio controls preload="none" src="pct-p150%.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
-<figure>
-  <figcaption>+200%</figcaption>
-  <audio controls preload="none" src="pct-p200%.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
-<figure>
-  <figcaption>+300%</figcaption>
-  <audio controls preload="none" src="pct-p300%.mp3"></audio>
-  <div class="meta">26928 B · abb5c66d668c2f0a</div>
-</figure>
+<figure><figcaption>+0%</figcaption><audio controls preload="none" src="pct-p0%25.mp3"></audio><div class="meta">26928 B · 9ce543433da195be</div></figure>
+<figure><figcaption>+10%</figcaption><audio controls preload="none" src="pct-p10%25.mp3"></audio><div class="meta">26928 B · 83fa9f86c468f99a</div></figure>
+<figure><figcaption>+25%</figcaption><audio controls preload="none" src="pct-p25%25.mp3"></audio><div class="meta">26928 B · 6b5e552eab786280</div></figure>
+<figure><figcaption>+50% · 失败</figcaption><div class="fail">合成失败（未产出音频）</div><div class="meta">edge-tts: websocket upgrade refused (HTTP 503)</div></figure>
+<figure><figcaption>+75%</figcaption><audio controls preload="none" src="pct-p75%25.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
+<figure><figcaption>+100%</figcaption><audio controls preload="none" src="pct-p100%25.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
+<figure><figcaption>+150%</figcaption><audio controls preload="none" src="pct-p150%25.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
+<figure><figcaption>+200%</figcaption><audio controls preload="none" src="pct-p200%25.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
+<figure><figcaption>+300%</figcaption><audio controls preload="none" src="pct-p300%25.mp3"></audio><div class="meta">26928 B · abb5c66d668c2f0a</div></figure>
 </div>
-
 <h2>关键字写法</h2>
 <div class="grid">
-<figure>
-  <figcaption>x-low</figcaption>
-  <audio controls preload="none" src="kw-xnlow.mp3"></audio>
-  <div class="meta">26928 B · 3ae2c30616c9faef</div>
-</figure>
-<figure>
-  <figcaption>low</figcaption>
-  <audio controls preload="none" src="kw-low.mp3"></audio>
-  <div class="meta">26928 B · e425a01576dc99d7</div>
-</figure>
-<figure>
-  <figcaption>medium</figcaption>
-  <audio controls preload="none" src="kw-medium.mp3"></audio>
-  <div class="meta">26928 B · 9ce543433da195be</div>
-</figure>
-<figure>
-  <figcaption>high</figcaption>
-  <audio controls preload="none" src="kw-high.mp3"></audio>
-  <div class="meta">26928 B · 83fa9f86c468f99a</div>
-</figure>
-<figure>
-  <figcaption>x-high</figcaption>
-  <audio controls preload="none" src="kw-xnhigh.mp3"></audio>
-  <div class="meta">26928 B · 9ebe2643d91ab83d</div>
-</figure>
+<figure><figcaption>x-low</figcaption><audio controls preload="none" src="kw-xnlow.mp3"></audio><div class="meta">26928 B · 3ae2c30616c9faef</div></figure>
+<figure><figcaption>low</figcaption><audio controls preload="none" src="kw-low.mp3"></audio><div class="meta">26928 B · e425a01576dc99d7</div></figure>
+<figure><figcaption>medium</figcaption><audio controls preload="none" src="kw-medium.mp3"></audio><div class="meta">26928 B · 9ce543433da195be</div></figure>
+<figure><figcaption>high</figcaption><audio controls preload="none" src="kw-high.mp3"></audio><div class="meta">26928 B · 83fa9f86c468f99a</div></figure>
+<figure><figcaption>x-high</figcaption><audio controls preload="none" src="kw-xnhigh.mp3"></audio><div class="meta">26928 B · 9ebe2643d91ab83d</div></figure>
 </div>
-
 <h2>负向（低沉嗓）</h2>
 <div class="grid">
-<figure>
-  <figcaption>-25Hz</figcaption>
-  <audio controls preload="none" src="neg-n25Hz.mp3"></audio>
-  <div class="meta">26928 B · 20aa8a299a3fa3e7</div>
-</figure>
-<figure>
-  <figcaption>-50Hz</figcaption>
-  <audio controls preload="none" src="neg-n50Hz.mp3"></audio>
-  <div class="meta">26928 B · 729a90289a452e8c</div>
-</figure>
+<figure><figcaption>-25Hz</figcaption><audio controls preload="none" src="neg-n25Hz.mp3"></audio><div class="meta">26928 B · 20aa8a299a3fa3e7</div></figure>
+<figure><figcaption>-50Hz</figcaption><audio controls preload="none" src="neg-n50Hz.mp3"></audio><div class="meta">26928 B · 729a90289a452e8c</div></figure>
 </div>
 <div class="note">
-  <b>怎么读这张表：</b>从某个值开始哈希不再变化，说明已到服务端上限。<br>
-  <b>注意：</b>你听到的是 Edge 的 Neural 音色，比 Windows 桌面音色（Huihui）自然得多。<br>
-  <b>若还不够强：</b>客户端播放时可再叠加 <code>playbackRate</code>（同时改变音高与时长，即经典「花栗鼠」效果）。
+  <b>结论：</b>Hz 写法在 <b>+90Hz</b> 之后被钳制；百分比写法在 <b>+75%</b> 之后被钳制。<br>
+  关键字 <code>x-low/low/medium/high/x-high</code> 全部有效；负向 <code>-25Hz/-50Hz</code> 可用于低沉嗓。<br>
+  <b>若还不够强：</b>插件在播放时叠加 <code>playbackRate</code> 且关闭音高补偿，
+  这会同时改变音高与时长（花栗鼠效果），从而突破服务端上限。<br>
+  <b>注意：</b>上表某次 <code>+50%</code> 的失败是服务端瞬时 503，不是参数无效。
 </div>
 </body></html>

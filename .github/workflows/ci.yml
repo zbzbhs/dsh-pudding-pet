@@ -1,0 +1,156 @@
+# ---------------------------------------------------------------------------
+# CI for dsh-pudding-pet
+#
+# The project is zero-dependency by design, so NO job installs anything:
+# there is no `npm install` / `pnpm install` step anywhere in this file.
+# Every check below is a plain `node` script run against the committed tree.
+#
+# Three jobs:
+#   test      -- the offline suite (5 scripts). This is the gate.
+#   contract  -- the 35-assertion browser contract test in real Chromium.
+#   tts       -- real Edge TTS synthesis. ONLINE and therefore advisory:
+#                Microsoft may refuse a CI egress IP, so `continue-on-error`
+#                keeps it from turning the whole workflow red.
+# ---------------------------------------------------------------------------
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: this workflow only reads the repository.
+permissions:
+  contents: read
+
+# A new run on the same branch supersedes the old one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Offline suite. No network, no installs, no browser.
+  # -------------------------------------------------------------------------
+  test:
+    name: Offline tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # NOTE: deliberately no dependency install step. The plugin ships zero
+      # runtime and zero dev dependencies; if a check ever needs a package,
+      # that is a design decision to make in the repo, not a CI workaround.
+
+      # First on purpose: a stale build artifact is the easiest mistake to
+      # make here (edit lib/client.template.js or assets/*, forget to rebuild).
+      - name: Build artifact is up to date
+        run: node tools/build.mjs --check
+
+      - name: Host contract (Cordis config, routes, vendored modules)
+        run: node tools/verify-host.mjs
+
+      - name: Client bundle export shape
+        run: node tools/inspect-exports.mjs
+
+      - name: Speech bridge (text extraction, late mount, silent by default)
+        run: node dev/test-speech-bridge.mjs
+
+      - name: Client engine selection and fallback
+        run: node dev/test-client-engine.mjs
+
+  # -------------------------------------------------------------------------
+  # Real Chromium contract test (35 assertions).
+  #
+  # Chrome provisioning: apt's `chromium-browser` on ubuntu-24.04 is a
+  # transitional snap stub and does NOT run on GitHub runners, so we use
+  # browser-actions/setup-chrome, which downloads the official
+  # Chrome-for-Testing build directly (no snap, no apt, no sudo).
+  # -------------------------------------------------------------------------
+  contract:
+    name: Chromium contract test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      # Resolve the binary defensively: prefer the action's declared output,
+      # then its CHROME_PATH env var, then whatever is on PATH. Whichever way
+      # setup-chrome names things, this step finds the browser or says so.
+      - name: Locate Chrome
+        run: |
+          CHROME="${{ steps.chrome.outputs.chrome-path }}"
+          [ -x "$CHROME" ] || CHROME="${CHROME_PATH:-}"
+          [ -x "$CHROME" ] || CHROME="$(command -v google-chrome || command -v chrome || true)"
+          if [ ! -x "$CHROME" ]; then
+            echo "::error title=Chrome not found::could not resolve a Chrome binary"
+            exit 1
+          fi
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          "$CHROME" --version
+
+      # `|| true` is intentional: headless Chrome often exits non-zero even
+      # when it produced a complete DOM. The next step is the real gate, and
+      # it reports clearly if the dump came out empty.
+      - name: Dump the contract DOM
+        run: |
+          "$CHROME" \
+            --headless --no-sandbox --disable-gpu \
+            --virtual-time-budget=16000 --dump-dom \
+            "file://$PWD/dev/test-contract.html" > contract-dom.html || true
+          echo "dumped $(wc -c < contract-dom.html) bytes"
+
+      - name: Assert the contract result (fail === 0)
+        run: node tools/check-contract-result.mjs contract-dom.html
+
+      # Only useful when the gate above failed, so keep it off the happy path.
+      - name: Upload the dumped DOM on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-dom
+          path: contract-dom.html
+
+  # -------------------------------------------------------------------------
+  # Online synthesis check. Advisory only.
+  #
+  # `continue-on-error: true` means a failure here is visible in the log and
+  # in the job list, but does NOT fail the workflow: Microsoft's public
+  # endpoint may reject the runner's egress IP, which says nothing about the
+  # plugin. Everything that must hold is already covered by the offline suite.
+  # -------------------------------------------------------------------------
+  tts:
+    name: Edge TTS synthesis (online, advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Real synthesis against the Microsoft endpoint
+        id: tts
+        run: node dev/test-host-tts.mjs
+
+      - name: Explain that this job is advisory
+        if: steps.tts.outcome == 'failure'
+        run: |
+          echo "::warning title=Edge TTS synthesis failed::This job is advisory and does not fail CI. The Microsoft endpoint may refuse the runner's egress IP, or the public endpoint may have changed. The offline suite and the Chromium contract test are the real gates."
