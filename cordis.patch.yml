@@ -3,9 +3,10 @@
 # Adds only this bundle's own plugin row. It overrides no shipped DSH component.
 #
 # The client half is driven by the `dsh.client` block in package.json; this patch
-# only inserts the host row. The host half registers nothing — it exists so the
-# package is a real bundle (a package without `dsh.bundle.patch` never joins the
-# bundle stack) and so the client module is loaded.
+# only inserts the host row. The host half registers the two GET-only synthesis
+# routes (`/pudding-pet/tts`, `/pudding-pet/voices`) through the `webServer`
+# service; the row also exists so the package is a real bundle (a package without
+# `dsh.bundle.patch` never joins the bundle stack) and so the client module loads.
 #
 # There is deliberately no `config:` here: the host half declares no `Config`
 # schema (see lib/index.js for why). To switch the row off, use the loader's own

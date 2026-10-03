@@ -7,7 +7,8 @@
 //
 // Results are written to dev/voice-samples/edge-range/ together with a
 // listenable index.html. The committed copy of that directory is the evidence
-// behind the table in _research/EdgeTTS变声范围实测.md.
+// behind the pitch-ceiling table quoted in README.md ("变声能力" row) and in
+// THIRD-PARTY-NOTICES.md § 4.
 //
 //   node tools/probe-edge-pitch-range.mjs
 //

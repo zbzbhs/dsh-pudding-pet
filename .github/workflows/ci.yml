@@ -6,7 +6,7 @@
 # Every check below is a plain `node` script run against the committed tree.
 #
 # Three jobs:
-#   test      -- the offline suite (5 scripts). This is the gate.
+#   test      -- the offline suite (9 scripts). This is the gate.
 #   contract  -- the 35-assertion browser contract test in real Chromium.
 #   tts       -- real Edge TTS synthesis. ONLINE and therefore advisory:
 #                Microsoft may refuse a CI egress IP, so `continue-on-error`
@@ -63,6 +63,18 @@ jobs:
 
       - name: Client engine selection and fallback
         run: node dev/test-client-engine.mjs
+
+      - name: Cancel race (Stop must not fall back and speak)
+        run: node dev/test-cancel-race.mjs
+
+      - name: Settings panel (controls, persistence, clamping, drag)
+        run: node dev/test-settings-panel.mjs
+
+      - name: Host hardening (fence, rebinding, injection, cache, abort)
+        run: node dev/test-host-hardening.mjs
+
+      - name: Pitch-shift mechanism (resampling arithmetic + bundle features)
+        run: node tools/verify-morph-mechanism.mjs
 
   # -------------------------------------------------------------------------
   # Real Chromium contract test (35 assertions).

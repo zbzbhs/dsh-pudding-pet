@@ -25,6 +25,12 @@
 *.woff  binary
 *.woff2 binary
 *.zip   binary
+# Audio probes under dev/voice-samples/ are committed as evidence; never
+# normalize them (a line-ending pass would corrupt the MP3/WAV payloads).
+*.mp3   binary
+*.wav   binary
+*.m4a   binary
+*.ogg   binary
 
 # Keep the generated bundle out of diffs' noise but still track it
 lib/client.js linguist-generated=true

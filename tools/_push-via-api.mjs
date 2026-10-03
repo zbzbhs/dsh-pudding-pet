@@ -10,10 +10,13 @@
 // ref. It never rewrites or force-pushes, and it refuses to run unless the
 // remote ref is an ancestor of what it is about to publish.
 import { execFileSync } from 'node:child_process';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const REPO = 'zbzbhs/dsh-pudding-pet';
 const BRANCH = 'main';
-const ROOT = 'D:\\Deepseek Harness file\\dsh-pudding-pet';
+// Derived from this file's location, so the script is not tied to one machine.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const git = (args, opts = {}) =>
   execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });

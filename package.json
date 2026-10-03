@@ -6,6 +6,23 @@
   "description": "布丁桌宠：一只住在 DSH 窗口里的猫，会读你的回复、用搞怪升调复述，可拖动、可换形象。",
   "icon": "./assets/icon.svg",
   "license": "MIT",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "desktop-pet",
+    "tts",
+    "edge-tts",
+    "speech-synthesis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zbzbhs/dsh-pudding-pet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zbzbhs/dsh-pudding-pet/issues"
+  },
+  "homepage": "https://github.com/zbzbhs/dsh-pudding-pet#readme",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
@@ -20,7 +37,9 @@
     "locale",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE-ASSETS.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },

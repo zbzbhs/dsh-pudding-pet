@@ -21,7 +21,8 @@
 - **朗读助手回复** —— 助手一边写，布丁一边念（监听模型输出的原始流，声音比屏幕上的字还早一点）。
 - **朗读你的输入** —— 可选，默认关闭。
 - **搞怪变声（两个引擎）** —— 把声音拉成那种欠揍的卡通嗓；可一键关掉变回正常嗓音：
-  - **Edge TTS（宿主侧，推荐）** —— 微软 Neural 音色，音质自然；音高偏移可到 **+200Hz** 量级，
+  - **Edge TTS（宿主侧，推荐）** —— 微软 Neural 音色，音质自然；音高偏移实测 **+90Hz** 封顶
+    （+100Hz 起被服务端钳制，见 `dev/voice-samples/edge-range/results.json`），
     还能再叠加「额外加速」做出花栗鼠效果，**能突破浏览器 2.0 的上限**。
   - **浏览器 speechSynthesis（离线回退）** —— 音高上限 **2.00**（Web 规范写死），
     而且输出无法被捕获，所以花栗鼠那套在它身上做不出来。
@@ -107,7 +108,7 @@ dsh plugin --profile desktop list
 |---|---|---|
 | 合成在哪里 | 插件宿主进程，请求微软 Edge 朗读端点 | 浏览器内部 |
 | 音色 | Neural 音色，明显更自然 | 系统自带语音 |
-| 变声能力 | 音高偏移可到 **+200Hz** 量级，再叠加「额外加速」做花栗鼠 | 音高上限 **2.00**（Web 规范写死） |
+| 变声能力 | 音高偏移实测 **+90Hz** 封顶，再叠加「额外加速」做花栗鼠 | 音高上限 **2.00**（Web 规范写死） |
 | 输出能否再加工 | 能 —— 拿到的是 MP3 字节，可以变速变调 | 不能 —— 输出无法被捕获 |
 | 需要联网 | **需要** | 不需要，完全离线 |
 | 不可用时 | 自动回退浏览器引擎 | —— |
@@ -133,7 +134,10 @@ dsh plugin --profile desktop list
 dsh-pudding-pet/
 ├── package.json           # 插件清单（dsh.bundle.patch + dsh.client.platform）
 ├── cordis.patch.yml       # 插入插件行
+├── LICENSE                # 代码：MIT
+├── LICENSE-ASSETS.md      # 美术：CC0-1.0
 ├── THIRD-PARTY-NOTICES.md # 第三方署名（vendored 文件的上游许可）
+├── .github/workflows/ci.yml  # CI：离线套件 + 契约测试 + 可选联网合成
 ├── lib/
 │   ├── client.template.js # ★ 浏览器侧源码，改这个
 │   ├── client.js          # 构建产物（含烘焙的素材），不要手改
@@ -145,7 +149,9 @@ dsh-pudding-pet/
 │   ├── pudding.js         # 形象控制器（含内联 SVG）
 │   └── icon.svg           # 插件管理器图标
 ├── locale/{zh,en}.json    # 文案
-├── tools/build.mjs        # 构建：把素材烘焙进 client.js
+├── docs/                  # README 配图与 10 状态对照页（不参与运行）
+├── tools/                 # 构建与校验脚本（不参与运行）
+│   └── build.mjs          # 构建：把素材烘焙进 client.js
 └── dev/                   # 本地开发与验证（不参与运行）
 ```
 
@@ -211,6 +217,9 @@ node tools/verify-host.mjs          # 宿主契约：无 Config、路由注册�
 node tools/inspect-exports.mjs      # client bundle 的导出结构
 node dev/test-speech-bridge.mjs     # 朗读桥：文本提取、晚挂载重试、默认静音
 node dev/test-client-engine.mjs     # 引擎选择与降级（宿主失败 → 浏览器）
+node dev/test-cancel-race.mjs       # 取消竞态：按「停止」后不得回退成浏览器朗读
+node dev/test-settings-panel.mjs    # 设置面板：控件、持久化、区间夹紧、拖动阈值
+node dev/test-host-hardening.mjs    # 宿主路由加固：围栏、DNS rebinding、SSML 注入、缓存、中止
 node tools/verify-morph-mechanism.mjs  # 变声机制（重采样算术 + 代码特性检测）
 ```
 
@@ -242,7 +251,8 @@ slots 服务、locale 服务、假的会话事件流）来驱动真实插件代�
 **验证的边界（如实说明）**：headless 环境下 `requestAnimationFrame` 不触发，
 所以**动画的运动过程无法用截图证明** —— 能证明的是静态姿势、状态切换、
 样式注入、以及朗读链路正确。动画观感请在真实浏览器里看
-`assets/pudding.js` 或上游形象的 `preview.html`。
+[`docs/states-preview.html`](docs/states-preview.html)（10 个状态的静态对照页）
+或 [`assets/pudding.js`](assets/pudding.js) 的实时动画。
 
 ### 持续集成
 
@@ -254,7 +264,7 @@ slots 服务、locale 服务、假的会话事件流）来驱动真实插件代�
 
 | job | 跑什么 | 超时 |
 |---|---|---|
-| `test` | 上面那 5 条离线命令，每条独立一步（`build.mjs --check` 放最前，产物过期是最容易犯的错） | 5 分钟 |
+| `test` | 上面那 9 条离线命令，每条独立一步（`build.mjs --check` 放最前，产物过期是最容易犯的错） | 5 分钟 |
 | `contract` | 真实 Chromium 跑 `dev/test-contract.html`，再由 `tools/check-contract-result.mjs` 读 `RESULT:{…}` 并断言 `fail === 0` | 10 分钟 |
 | `tts` | `dev/test-host-tts.mjs`，需要联网 | 10 分钟 |
 
@@ -336,11 +346,14 @@ runner 上没有 profile，必然失败。它是给本地用的。
 
 [`lib/edge-tts.js`](lib/edge-tts.js) 是从上游 MIT 项目 **dsh-tts-reader**
 vendored 进来的 Edge TTS 客户端 —— **只加了一个 provenance 头注释，正文逐字节未改**。
-宿主侧的语音路由（GET-only、拒绝跨站、同源 `Origin` 校验）的**检查项思路**
-参考了 **dsh-speech-plugin**（同为 MIT），**没有复制任何代码**。
+宿主侧两条路由的**通用写法**（`webServer.register` 精确路径 + 方法判定 + 状态码约定）
+参考了 **dsh-speech-plugin**（同为 MIT），**没有复制任何代码**；
+`Sec-Fetch-Site` 与同源 `Origin` 这两项检查是本项目自行添加的。
 
 上游项目名、URL、版权归属和**完整的 MIT 许可证文本**都记在
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)；再分发前请一并保留。
+该文件还列出了协议常量的参考来源（`rany2/edge-tts`，注意其上游为 LGPLv3）
+与 `dev/voice-samples/` 探测音频的来源。
 
 ---
 

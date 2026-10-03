@@ -98,12 +98,18 @@
 
 ## 4. 第三方依赖
 
-**无。**
+**美术与前端代码：无。**
 
 - 不含任何第三方字体（使用系统 UI 字体栈；SVG 内**没有文字元素**）。
-- 不含任何第三方图像、图标、音频。
+- 不含任何第三方图像、图标、音频素材。
 - `assets/pudding.js` 零运行时依赖，不发起任何网络请求。
-- 语音由浏览器内置的 Web Speech API 提供，不调用任何云服务。
+
+**语音部分另有说明**（详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）：
+
+- **浏览器引擎**由浏览器内置的 Web Speech API 提供，完全离线。
+- **Edge 引擎**（`lib/edge-tts.js`，宿主侧）会联网调用微软的公开朗读端点，
+  该文件是从上游 MIT 项目 **dsh-tts-reader** vendored 而来。
+- `dev/voice-samples/` 下的音频是本仓库脚本生成的**探测样本**，不是第三方素材。
 
 ---
 

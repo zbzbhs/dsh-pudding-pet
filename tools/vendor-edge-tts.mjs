@@ -45,7 +45,7 @@ const header = `/**
  *
  * @license MIT
  * @source  https://github.com/lemonhall/dsh-tts-reader (lib/edge-tts.js)
- * @copyright Copyright (c) the dsh-tts-reader authors
+ * @copyright Copyright (c) 2026 lemonhall
  *
  * This file is copied from the upstream project above, which is MIT licensed,
  * so it may be redistributed provided the copyright notice and permission
