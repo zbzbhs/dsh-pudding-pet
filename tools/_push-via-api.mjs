@@ -22,16 +22,45 @@ const git = (args, opts = {}) =>
   execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 const gh = (args, input) =>
   execFileSync('gh', args, { encoding: 'utf8', input, maxBuffer: 64 * 1024 * 1024 });
+
+/**
+ * Call the API, retrying transient network failures.
+ *
+ * Uploading a blob over a flaky link fails with `unexpected EOF` rather than an
+ * HTTP status, so it is indistinguishable from a permanent error by code alone. A
+ * push is idempotent here — blobs and trees are content-addressed, and the ref
+ * update is the only step whose ordering matters — so retrying is safe. Read-only
+ * calls get the same treatment for the same reason.
+ */
 const api = (path, init = {}) => {
   const args = ['api', '--method', init.method || 'GET', path];
   if (init.accept) args.push('-H', `Accept: ${init.accept}`);
-  let out;
-  if (init.body !== undefined) {
-    out = gh([...args, '--input', '-'], JSON.stringify(init.body));
-  } else {
-    out = gh(args);
+  const isWrite = (init.method || 'GET') !== 'GET';
+  const attempts = isWrite ? 5 : 3;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const out = init.body !== undefined
+        ? gh([...args, '--input', '-'], JSON.stringify(init.body))
+        : gh(args);
+      return out ? JSON.parse(out) : null;
+    } catch (error) {
+      lastError = error;
+      const detail = String((error && (error.stderr || error.message)) || '');
+      // Transient if it looks like a link problem rather than a rejection. A
+      // `gh` failure here reports transport errors as text, so the match is on
+      // wording: EOF, resets, timeouts (including a TLS handshake timeout), and
+      // the gateway statuses. A 4xx like 422 (bad request) is NOT transient.
+      const transient = /unexpected EOF|ECONNRESET|ETIMEDOUT|ECONNREFUSED|EPIPE|i\/o timeout|handshake timeout|connection reset|temporarily unavailable|\b50[234]\b/i
+        .test(detail);
+      if (!transient || attempt === attempts) break;
+      // Linear backoff: a hiccup usually clears within a second or two.
+      const waitMs = 800 * attempt;
+      console.log(`    retry ${attempt}/${attempts - 1} after: ${detail.split('\n')[0].slice(0, 70)}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, waitMs);
+    }
   }
-  return out ? JSON.parse(out) : null;
+  throw lastError;
 };
 
 const log = (...a) => console.log(...a);
