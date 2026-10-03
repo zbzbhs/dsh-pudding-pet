@@ -1,4 +1,4 @@
-﻿# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # CI for dsh-pudding-pet
 #
 # The project is zero-dependency by design, so NO job installs anything:
@@ -6,7 +6,7 @@
 # Every check below is a plain `node` script run against the committed tree.
 #
 # Three jobs:
-#   test      -- the offline suite (10 scripts). This is the gate.
+#   test      -- the offline suite (11 scripts). This is the gate.
 #   contract  -- the 35-assertion browser contract test in real Chromium.
 #   tts       -- real Edge TTS synthesis. ONLINE and therefore advisory:
 #                Microsoft may refuse a CI egress IP, so `continue-on-error`
@@ -66,6 +66,9 @@ jobs:
 
       - name: Cancel race (Stop must not fall back and speak)
         run: node dev/test-cancel-race.mjs
+
+      - name: Audio volume (a prosody offset must not silence playback)
+        run: node dev/test-audio-volume.mjs
 
       - name: Settings panel (controls, persistence, clamping, drag)
         run: node dev/test-settings-panel.mjs
