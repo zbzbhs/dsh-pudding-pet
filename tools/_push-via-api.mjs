@@ -46,25 +46,43 @@ if (remoteSha === localSha) {
 }
 
 // ---- 2. the commits to publish, oldest first -------------------------------
-const revList = git(['rev-list', '--reverse', `${remoteSha}..${localSha}`])
-  .trim().split('\n').filter(Boolean);
+// The remote tip may be an object this clone has never seen: publishing through
+// the API creates commits server-side, so their SHAs differ from the local ones
+// and `git rev-list <remote>..<local>` cannot resolve the range.
+//
+// The boundary is therefore found by matching the remote tip's *subject line*
+// against the local history. The full message is not compared: the API
+// round-trip can normalize trailing whitespace, which made an exact match fail.
+const remoteCommit = api(`repos/${REPO}/git/commits/${remoteSha}`);
+const remoteSubject = String(remoteCommit.message || '').split('\n')[0].trim();
+
+const localCommits = git(['log', '--pretty=%H%x00%s', `refs/heads/${BRANCH}`])
+  .split('\n')
+  .filter(Boolean)
+  .map((line) => {
+    const [sha, subject] = line.split('\u0000');
+    return { sha, subject: String(subject || '').trim() };
+  });
+
+const boundary = localCommits.findIndex((c) => c.subject === remoteSubject);
+if (boundary < 0) {
+  console.error('\nREFUSING: the remote tip does not correspond to any local commit.');
+  console.error('Publish or fetch it first, then re-run.');
+  console.error('remote subject:', JSON.stringify(remoteSubject));
+  console.error('local subjects (newest first):');
+  for (const c of localCommits.slice(0, 5)) console.error('  ', JSON.stringify(c.subject));
+  process.exit(1);
+}
+
+// `git log` is newest-first; publish oldest-first.
+const revList = localCommits.slice(0, boundary).map((c) => c.sha).reverse();
 if (revList.length === 0) {
-  log('nothing to push (local is not ahead)');
+  log('nothing to push (the remote tip already matches the newest local commit)');
   process.exit(0);
 }
 log('\ncommits to publish:', revList.length);
 for (const sha of revList) {
   log(' ', sha.slice(0, 7), git(['log', '-1', '--pretty=%s', sha]).trim().slice(0, 70));
-}
-
-// Safety: the remote tip must be an ancestor of the local tip, otherwise this
-// would be a non-fast-forward publish.
-try {
-  git(['merge-base', '--is-ancestor', remoteSha, localSha]);
-} catch {
-  console.error('\nREFUSING: the remote tip is not an ancestor of the local tip.');
-  console.error('This would not be a fast-forward; resolve it with git instead.');
-  process.exit(1);
 }
 
 // ---- 3. replay each commit -------------------------------------------------
