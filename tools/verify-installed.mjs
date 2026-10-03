@@ -73,8 +73,38 @@ note(typeof host.apply === 'function', 'exports apply()');
 note(typeof host.name === 'string', 'exports name');
 try { resolveConfig(host, {}); note(true, 'resolveConfig() accepts the module'); }
 catch (error) { note(false, 'resolveConfig() accepts the module', error.message); }
-try { host.apply({ logger: { debug() {}, info() {} } }, {}); note(true, 'apply(ctx) runs without throwing'); }
-catch (error) { note(false, 'apply(ctx) runs without throwing', error.message); }
+{
+  // The host half waits for `webServer` through ctx.inject, so a stub without
+  // it would fail for the wrong reason. Count the routes it registers too.
+  const routes = [];
+  const ctx = {
+    inject(names, fn) { fn(ctx); },
+    effect(fn) { return fn; },
+    on() {},
+    logger: { warn() {}, info() {}, debug() {} },
+    webServer: { register({ path }) { routes.push(path); return () => {}; } },
+  };
+  try {
+    host.apply(ctx, {});
+    note(true, 'apply(ctx) runs without throwing');
+    note(routes.length === 2, 'registers the two synthesis routes', 'count=' + routes.length);
+    note(routes.includes('/pudding-pet/tts'), 'tts route registered');
+    note(routes.includes('/pudding-pet/voices'), 'voices route registered');
+  } catch (error) {
+    note(false, 'apply(ctx) runs without throwing', error.message);
+  }
+}
+
+console.log('\n=== vendored synthesis module ===');
+{
+  const vendored = join(PROFILE, 'lib/edge-tts.js');
+  note(existsSync(vendored), 'lib/edge-tts.js present');
+  if (existsSync(vendored)) {
+    const text = readFileSync(vendored, 'utf8');
+    note(/\bMIT\b/.test(text), 'carries an MIT notice');
+    note(/dsh-tts-reader/.test(text), 'names its upstream source');
+  }
+}
 
 console.log('\n=== manifest declares a bundle + client half ===');
 const pkg = JSON.parse(readFileSync(join(PROFILE, 'package.json'), 'utf8'));
